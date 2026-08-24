@@ -57,7 +57,8 @@ function Home() {
   }, []);
 
   const mutation = useMutation({
-    mutationFn: (q: string) => recommend({ data: { query: q, excludeIds: [] } }),
+    mutationFn: (input: { q: string; seed: number }) =>
+      recommend({ data: { query: input.q, excludeIds: [], seed: input.seed } }),
     onSuccess: (res) => {
       if (res.notice) toast.message(res.notice);
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
@@ -65,8 +66,10 @@ function Home() {
     onError: () => toast.error("Recommendation failed. Try again."),
   });
 
+  const run = (q: string) => mutation.mutate({ q, seed: Math.floor(Math.random() * 100000) });
+
   useEffect(() => {
-    mutation.mutate("");
+    run("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,6 +77,7 @@ function Home() {
     () => (mutation.data?.items ?? []).map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })),
     [mutation.data],
   );
+
 
   const observation = useMemo(() => {
     const tags = snapshot?.tags ?? [];
