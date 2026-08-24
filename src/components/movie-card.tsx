@@ -27,6 +27,8 @@ export function MovieCard({
     e.preventDefault();
     e.stopPropagation();
     action.mutate({ movieId: movie.id, action: next });
+    // Acting on a pick means it's handled — free up the slot for a fresh one.
+    if (onRemove && (next === "like" || next === "add_list" || next === "watched")) onRemove(movie.id);
   };
 
   return (
