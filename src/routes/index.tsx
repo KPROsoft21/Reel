@@ -49,6 +49,8 @@ function Home() {
   const [promptIndex, setPromptIndex] = useState(0);
   const [heading, setHeading] = useState("Best matches");
   const [dismissed, setDismissed] = useState<number[]>([]);
+  const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
+  const [lastQuery, setLastQuery] = useState("");
   const recommend = useServerFn(getRecommendations);
   const { data: snapshot } = useSnapshot();
 
@@ -59,12 +61,21 @@ function Home() {
 
   const mutation = useMutation({
     mutationFn: (input: { q: string; seed: number }) =>
-      recommend({ data: { query: input.q, excludeIds: dismissed, seed: input.seed } }),
-    onSuccess: (res) => {
+      recommend({ data: { query: input.q, excludeIds: dismissed, seed: input.seed, limit: 9 } }),
+    onSuccess: (res, input) => {
       if (res.notice) toast.message(res.notice);
+      setLastQuery(input.q);
+      setFeed(res.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
     },
     onError: () => toast.error("Recommendation failed. Try again."),
+  });
+
+  const replace = useMutation({
+    mutationFn: (input: { exclude: number[] }) =>
+      recommend({
+        data: { query: lastQuery, excludeIds: input.exclude, seed: Math.floor(Math.random() * 100000), limit: 1 },
+      }),
   });
 
   const run = (q: string) => mutation.mutate({ q, seed: Math.floor(Math.random() * 100000) });
@@ -74,13 +85,31 @@ function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const items = useMemo(
-    () =>
-      (mutation.data?.items ?? [])
-        .filter((i) => !dismissed.includes(i.movieId))
-        .map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })),
-    [mutation.data, dismissed],
-  );
+  const onRemove = (id: number) => {
+    const nextDismissed = dismissed.includes(id) ? dismissed : [...dismissed, id];
+    setDismissed(nextDismissed);
+    const index = feed.findIndex((i) => i.movieId === id);
+    const remaining = feed.filter((i) => i.movieId !== id);
+    setFeed(remaining);
+    replace.mutate(
+      { exclude: [...nextDismissed, ...remaining.map((i) => i.movieId)] },
+      {
+        onSuccess: (res) => {
+          const pick = res.items[0];
+          if (!pick) return;
+          setFeed((current) => {
+            if (current.some((i) => i.movieId === pick.movieId)) return current;
+            const next = [...current];
+            next.splice(Math.max(0, index), 0, { movieId: pick.movieId, fit: pick.fit, reasons: pick.reasons });
+            return next;
+          });
+        },
+      },
+    );
+  };
+
+  const items = feed;
+
 
 
   const observation = useMemo(() => {
