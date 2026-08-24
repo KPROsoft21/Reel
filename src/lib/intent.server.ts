@@ -106,12 +106,12 @@ function normalizeIntent(raw: LooseIntent, fallback: Intent, query: string): Int
 
   return {
     exact_title: typeof raw["exact_title"] === "string" ? raw["exact_title"] : null,
-    similar_to: similar.length ? similar : fallback.similar_to,
-    positive: Object.keys(positive).length ? positive : fallback.positive,
-    negative: Object.keys(negative).length ? negative : fallback.negative,
-    genres_include: include.length ? include : fallback.genres_include,
+    similar_to: similar.length ? similar : fallback.similar_to ?? [],
+    positive: Object.keys(positive).length ? positive : fallback.positive ?? {},
+    negative: Object.keys(negative).length ? negative : fallback.negative ?? {},
+    genres_include: include.length ? include : fallback.genres_include ?? [],
     genres_exclude: cleanGenres(raw["genres_exclude"]),
-    runtime_max: Number.isFinite(runtimeMax) && runtimeMax > 0 ? runtimeMax : fallback.runtime_max,
+    runtime_max: Number.isFinite(runtimeMax) && runtimeMax > 0 ? runtimeMax : fallback.runtime_max ?? null,
     runtime_min: Number.isFinite(runtimeMin) && runtimeMin > 0 ? runtimeMin : null,
     summary: summary || query.slice(0, 60),
   };
