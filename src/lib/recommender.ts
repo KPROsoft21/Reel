@@ -120,7 +120,7 @@ export function intentMatch(movie: Movie, intent: Intent): { score: number; hard
     if (f === undefined) continue;
     const want = clamp01(v);
     // Reward movies that reach the requested level; only penalise falling short.
-    parts.push([clamp01(1 - Math.max(0, want - f) * 1.6), 1.5 * Math.max(0.3, want)]);
+    parts.push([clamp01(1 - Math.max(0, want - f) * 2.4), 2 * Math.max(0.3, want)]);
   }
   for (const [k, v] of Object.entries(intent.negative ?? {})) {
     const f = movie.features[k];
