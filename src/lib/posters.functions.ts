@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { CATALOG } from "@/data/catalog";
+import { MOVIES } from "@/data/catalog";
 
 export type PosterEntry = { poster: string | null; backdrop: string | null };
 
@@ -44,7 +44,7 @@ export const getPosters = createServerFn({ method: "GET" }).handler(async () => 
   }
 
   const apiKey = process.env["TMDB_API_KEY"];
-  const missing = CATALOG.filter((m) => !(m.id in map));
+  const missing = MOVIES.filter((m) => !(m.id in map));
   if (!apiKey || missing.length === 0) return map;
 
   const inserts: {
