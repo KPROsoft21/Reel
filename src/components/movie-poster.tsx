@@ -1,11 +1,13 @@
 import type { Movie } from "@/data/catalog";
+import { usePoster } from "@/hooks/use-posters";
 import { cn } from "@/lib/utils";
 
 /**
- * Typographic poster: deterministic per-title composition so the grid stays
- * poster-centric without depending on external artwork.
+ * Poster: real TMDB artwork when available, with a deterministic typographic
+ * composition as the fallback so the grid never shows an empty tile.
  */
 export function MoviePoster({ movie, className }: { movie: Movie; className?: string }) {
+  const art = usePoster(movie.id);
   const hue = (movie.id * 47) % 360;
   const dark = movie.features['dark_tone'] ?? 0.5;
   const style = {
@@ -20,16 +22,39 @@ export function MoviePoster({ movie, className }: { movie: Movie; className?: st
         className,
       )}
     >
-      <div className="grain pointer-events-none absolute inset-0 opacity-60" />
-      <span className="relative text-[0.65rem] uppercase tracking-[0.22em] text-foreground/60">
-        {movie.genres[0]}
-      </span>
-      <div className="relative">
-        <h3 className="font-display text-2xl leading-[1.05] text-foreground">{movie.title}</h3>
-        <p className="mt-1 text-[0.7rem] uppercase tracking-[0.18em] text-foreground/55">
-          {movie.year} · {movie.runtime}m
-        </p>
-      </div>
+      {art?.poster ? (
+        <>
+          <img
+            src={art.poster}
+            alt={`${movie.title} poster`}
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/85 via-background/10 to-transparent" />
+          <span className="relative" />
+          <div className="relative">
+            <h3 className="font-display text-xl leading-[1.05] text-foreground drop-shadow">
+              {movie.title}
+            </h3>
+            <p className="mt-1 text-[0.7rem] uppercase tracking-[0.18em] text-foreground/70">
+              {movie.year} · {movie.runtime}m
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="grain pointer-events-none absolute inset-0 opacity-60" />
+          <span className="relative text-[0.65rem] uppercase tracking-[0.22em] text-foreground/60">
+            {movie.genres[0]}
+          </span>
+          <div className="relative">
+            <h3 className="font-display text-2xl leading-[1.05] text-foreground">{movie.title}</h3>
+            <p className="mt-1 text-[0.7rem] uppercase tracking-[0.18em] text-foreground/55">
+              {movie.year} · {movie.runtime}m
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
