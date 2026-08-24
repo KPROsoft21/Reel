@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      movie_posters: {
+        Row: {
+          backdrop_url: string | null
+          movie_id: number
+          poster_url: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          backdrop_url?: string | null
+          movie_id: number
+          poster_url?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          backdrop_url?: string | null
+          movie_id?: number
+          poster_url?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
