@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Check, Heart, Plus } from "lucide-react";
+import { Check, Heart, Plus, X } from "lucide-react";
 
 import type { Movie } from "@/data/catalog";
 import { cn } from "@/lib/utils";
@@ -13,11 +13,13 @@ export function MovieCard({
   state,
   fit,
   reasons,
+  onRemove,
 }: {
   movie: Movie;
   state: CardState;
   fit?: number;
   reasons?: string[];
+  onRemove?: (movieId: number) => void;
 }) {
   const action = useMovieAction();
 
@@ -35,6 +37,22 @@ export function MovieCard({
     >
       <div className="relative">
         <MoviePoster movie={movie} className="transition-transform duration-300 group-hover:-translate-y-1" />
+        {onRemove && (
+          <button
+            type="button"
+            aria-label="Not interested"
+            title="Not interested"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              action.mutate({ movieId: movie.id, action: "dislike" });
+              onRemove(movie.id);
+            }}
+            className="chamfer-sm hairline absolute left-2 top-2 flex size-8 items-center justify-center bg-background/80 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            <X className="size-4" />
+          </button>
+        )}
         {typeof fit === "number" && (
           <span className="chamfer-sm absolute right-2 top-2 bg-background/80 px-2 py-1 text-[0.65rem] uppercase tracking-[0.15em] text-primary">
             {fit}% fit

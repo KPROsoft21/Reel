@@ -4,7 +4,15 @@ import { useSnapshot } from "@/hooks/use-app-data";
 
 export type GridItem = { movieId: number; fit?: number; reasons?: string[] };
 
-export function MovieGrid({ items, empty }: { items: GridItem[]; empty?: React.ReactNode }) {
+export function MovieGrid({
+  items,
+  empty,
+  onRemove,
+}: {
+  items: GridItem[];
+  empty?: React.ReactNode;
+  onRemove?: (movieId: number) => void;
+}) {
   const { data } = useSnapshot();
 
   if (!items.length) {
@@ -26,6 +34,7 @@ export function MovieGrid({ items, empty }: { items: GridItem[]; empty?: React.R
             movie={movie}
             {...(typeof item.fit === "number" ? { fit: item.fit } : {})}
             {...(item.reasons ? { reasons: item.reasons } : {})}
+            {...(onRemove ? { onRemove } : {})}
             state={{
               liked: state?.liked ?? null,
               watched: state?.watched ?? false,
