@@ -48,6 +48,7 @@ function Home() {
   const [query, setQuery] = useState("");
   const [promptIndex, setPromptIndex] = useState(0);
   const [heading, setHeading] = useState("Best matches");
+  const [dismissed, setDismissed] = useState<number[]>([]);
   const recommend = useServerFn(getRecommendations);
   const { data: snapshot } = useSnapshot();
 
@@ -58,7 +59,7 @@ function Home() {
 
   const mutation = useMutation({
     mutationFn: (input: { q: string; seed: number }) =>
-      recommend({ data: { query: input.q, excludeIds: [], seed: input.seed } }),
+      recommend({ data: { query: input.q, excludeIds: dismissed, seed: input.seed } }),
     onSuccess: (res) => {
       if (res.notice) toast.message(res.notice);
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
@@ -74,8 +75,11 @@ function Home() {
   }, []);
 
   const items = useMemo(
-    () => (mutation.data?.items ?? []).map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })),
-    [mutation.data],
+    () =>
+      (mutation.data?.items ?? [])
+        .filter((i) => !dismissed.includes(i.movieId))
+        .map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })),
+    [mutation.data, dismissed],
   );
 
 
@@ -148,7 +152,11 @@ function Home() {
           ))}
         </div>
       ) : (
-        <MovieGrid items={items} empty="No matches for that. Try loosening the constraints." />
+        <MovieGrid
+          items={items}
+          onRemove={(id) => setDismissed((d) => (d.includes(id) ? d : [...d, id]))}
+          empty="No matches for that. Try loosening the constraints."
+        />
       )}
     </div>
   );
