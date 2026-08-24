@@ -57,7 +57,8 @@ function Home() {
   }, []);
 
   const mutation = useMutation({
-    mutationFn: (q: string) => recommend({ data: { query: q, excludeIds: [] } }),
+    mutationFn: (input: { q: string; seed: number }) =>
+      recommend({ data: { query: input.q, excludeIds: [], seed: input.seed } }),
     onSuccess: (res) => {
       if (res.notice) toast.message(res.notice);
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
@@ -65,8 +66,10 @@ function Home() {
     onError: () => toast.error("Recommendation failed. Try again."),
   });
 
+  const run = (q: string) => mutation.mutate({ q, seed: Math.floor(Math.random() * 100000) });
+
   useEffect(() => {
-    mutation.mutate("");
+    run("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -74,6 +77,7 @@ function Home() {
     () => (mutation.data?.items ?? []).map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })),
     [mutation.data],
   );
+
 
   const observation = useMemo(() => {
     const tags = snapshot?.tags ?? [];
@@ -91,7 +95,7 @@ function Home() {
           className="mx-auto mt-8 flex max-w-2xl items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            mutation.mutate(query);
+            run(query);
           }}
         >
           <input
@@ -124,7 +128,17 @@ function Home() {
 
       <div className="mb-6 flex items-baseline justify-between gap-4">
         <h2 className="font-display text-2xl">{mutation.isPending ? "Thinking…" : heading}</h2>
-        <FeedbackDialog trigger="These aren't right" />
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => run(query)}
+            disabled={mutation.isPending}
+            className="text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            Show different picks
+          </button>
+          <FeedbackDialog trigger="These aren't right" />
+        </div>
       </div>
 
       {mutation.isPending ? (

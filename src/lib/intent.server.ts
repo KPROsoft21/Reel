@@ -7,19 +7,7 @@ import type { Intent } from "./recommender";
 
 const MODEL = "google/gemini-3.7-flash";
 
-const featureRecord = z.record(z.enum(FEATURE_KEYS as unknown as [string, ...string[]]), z.number());
 
-const IntentSchema = z.object({
-  exact_title: z.string().nullable().describe("Set only when the user is clearly searching for one specific film by name"),
-  similar_to: z.array(z.string()).describe("Movie titles the user referenced as a comparison"),
-  positive: featureRecord.describe("Desired feature levels, 0..1"),
-  negative: featureRecord.describe("Features to avoid, 0..1 where 1 means strongly avoid"),
-  genres_include: z.array(z.string()),
-  genres_exclude: z.array(z.string()),
-  runtime_max: z.number().nullable(),
-  runtime_min: z.number().nullable(),
-  summary: z.string().describe("One short clause describing the mood, e.g. 'a lighter space epic'"),
-});
 
 const SYSTEM = `You translate a movie viewer's natural language mood request into structured retrieval signals.
 Available semantic features (values 0..1): ${FEATURE_KEYS.join(", ")}.
@@ -82,26 +70,84 @@ export function heuristicIntent(query: string): Intent {
   };
 }
 
+type LooseIntent = Record<string, any>;
+
+const FEATURE_SET = new Set<string>(FEATURE_KEYS as unknown as string[]);
+const GENRE_SET = new Set<string>(ALL_GENRES as unknown as string[]);
+
+function cleanFeatures(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Number(v);
+    if (FEATURE_SET.has(k) && Number.isFinite(n)) out[k] = Math.max(0, Math.min(1, n));
+  }
+  return out;
+}
+
+function cleanGenres(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((g) => String(g))
+    .map((g) => ALL_GENRES.find((x) => x.toLowerCase() === g.toLowerCase()) ?? g)
+    .filter((g) => GENRE_SET.has(g));
+}
+
+/** The model's JSON shape varies; normalise whatever it returns into an Intent. */
+function normalizeIntent(raw: LooseIntent, fallback: Intent, query: string): Intent {
+  const sem = raw["semantic_features"] ?? raw["features"] ?? {};
+  const positive = { ...cleanFeatures(raw["positive"]), ...cleanFeatures(sem?.positive) };
+  const negative = { ...cleanFeatures(raw["negative"]), ...cleanFeatures(sem?.negative) };
+  const include = cleanGenres(raw["genres_include"] ?? raw["genres"]);
+  const runtimeMax = Number(raw["runtime_max"]);
+  const runtimeMin = Number(raw["runtime_min"]);
+  const similar = Array.isArray(raw["similar_to"]) ? raw["similar_to"].map(String) : [];
+  const summary = typeof raw["summary"] === "string" ? raw["summary"] : "";
+
+  return {
+    exact_title: typeof raw["exact_title"] === "string" ? raw["exact_title"] : null,
+    similar_to: similar.length ? similar : fallback.similar_to ?? [],
+    positive: Object.keys(positive).length ? positive : fallback.positive ?? {},
+    negative: Object.keys(negative).length ? negative : fallback.negative ?? {},
+    genres_include: include.length ? include : fallback.genres_include ?? [],
+    genres_exclude: cleanGenres(raw["genres_exclude"]),
+    runtime_max: Number.isFinite(runtimeMax) && runtimeMax > 0 ? runtimeMax : fallback.runtime_max ?? null,
+    runtime_min: Number.isFinite(runtimeMin) && runtimeMin > 0 ? runtimeMin : null,
+    summary: summary || query.slice(0, 60),
+  };
+}
+
+function extractJson(text: string): LooseIntent | null {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1)) as LooseIntent;
+  } catch {
+    return null;
+  }
+}
+
 export async function interpretIntent(query: string): Promise<{ intent: Intent; notice?: string }> {
   const key = process.env["LOVABLE_API_KEY"];
-  if (!key) return { intent: heuristicIntent(query) };
+  const fallback = heuristicIntent(query);
+  if (!key) return { intent: fallback };
 
   try {
     const gateway = createLovableAiGatewayProvider(key);
-    const { output } = await generateText({
+    const { text } = await generateText({
       model: gateway(MODEL),
-      system: SYSTEM,
+      system: `${SYSTEM}
+
+Reply with ONLY a JSON object using exactly these keys:
+{"exact_title": string|null, "similar_to": string[], "positive": {feature: 0..1}, "negative": {feature: 0..1}, "genres_include": string[], "genres_exclude": string[], "runtime_max": number|null, "runtime_min": number|null, "summary": string}`,
       prompt: query,
-      output: Output.object({ schema: IntentSchema }),
     });
-    const fallback = heuristicIntent(query);
-    return {
-      intent: {
-        ...output,
-        similar_to: output.similar_to?.length ? output.similar_to : fallback.similar_to,
-        summary: output.summary || fallback.summary,
-      } as Intent,
-    };
+    const raw = extractJson(text);
+    if (!raw) return { intent: fallback };
+    return { intent: normalizeIntent(raw, fallback, query) };
+
+
   } catch (error) {
     console.error("intent interpretation failed", error);
     return { intent: heuristicIntent(query), notice: gatewayErrorMessage(error) };
