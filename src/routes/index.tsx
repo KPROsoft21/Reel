@@ -183,7 +183,7 @@ function Home() {
       ) : (
         <MovieGrid
           items={items}
-          onRemove={(id) => setDismissed((d) => (d.includes(id) ? d : [...d, id]))}
+          onRemove={onRemove}
           empty="No matches for that. Try loosening the constraints."
         />
       )}
