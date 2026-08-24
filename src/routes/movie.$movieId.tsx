@@ -1,4 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo } from "react";
 import { Check, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
 
@@ -7,6 +9,7 @@ import { MoviePoster } from "@/components/movie-poster";
 import { MovieGrid } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { MOVIES, MOVIES_BY_ID } from "@/data/catalog";
+import { getRecommendations } from "@/lib/app.functions";
 import { FEATURE_LABELS, semanticSimilarity } from "@/lib/recommender";
 import { useMovieAction, useSnapshot } from "@/hooks/use-app-data";
 import { cn } from "@/lib/utils";
@@ -63,7 +66,7 @@ function MovieDetail() {
     [movie],
   );
 
-  const similar = useMemo(
+  const fallbackSimilar = useMemo(
     () =>
       MOVIES.filter((m) => m.id !== movie.id)
         .map((m) => ({ m, s: semanticSimilarity(m, [movie]) }))
@@ -72,6 +75,17 @@ function MovieDetail() {
         .map(({ m }) => ({ movieId: m.id })),
     [movie],
   );
+
+  const recommend = useServerFn(getRecommendations);
+  const similarQuery = useQuery({
+    queryKey: ["similar", movie.id],
+    queryFn: () => recommend({ data: { query: "", excludeIds: [], seed: 0, limit: 6, similarToMovieId: movie.id } }),
+    staleTime: 60_000,
+  });
+
+  const similar = similarQuery.data?.items.length
+    ? similarQuery.data.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons }))
+    : fallbackSimilar;
 
   return (
     <article>
@@ -131,7 +145,7 @@ function MovieDetail() {
       </div>
 
       <section className="mt-16">
-        <h2 className="mb-6 font-display text-2xl">Similar in feel</h2>
+        <h2 className="mb-6 font-display text-2xl">More like {movie.title}</h2>
         <MovieGrid items={similar} />
       </section>
     </article>
