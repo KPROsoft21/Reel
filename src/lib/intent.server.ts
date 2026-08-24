@@ -98,11 +98,18 @@ export async function interpretIntent(query: string): Promise<{ intent: Intent; 
     const fallback = heuristicIntent(query);
     return {
       intent: {
-        ...output,
+        exact_title: output.exact_title ?? null,
         similar_to: output.similar_to?.length ? output.similar_to : fallback.similar_to,
+        positive: Object.keys(output.positive ?? {}).length ? (output.positive as Record<string, number>) : fallback.positive,
+        negative: (output.negative as Record<string, number> | undefined) ?? fallback.negative,
+        genres_include: output.genres_include ?? fallback.genres_include,
+        genres_exclude: output.genres_exclude ?? [],
+        runtime_max: output.runtime_max ?? fallback.runtime_max,
+        runtime_min: output.runtime_min ?? null,
         summary: output.summary || fallback.summary,
-      } as Intent,
+      } satisfies Intent,
     };
+
   } catch (error) {
     console.error("intent interpretation failed", error);
     return { intent: heuristicIntent(query), notice: gatewayErrorMessage(error) };
