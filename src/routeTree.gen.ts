@@ -10,33 +10,115 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as MyListRouteImport } from './routes/my-list'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as WatchedRouteImport } from './routes/watched'
+import { Route as MovieMovieIdRouteImport } from './routes/movie.$movieId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FavoritesRoute = FavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyListRoute = MyListRouteImport.update({
+  id: '/my-list',
+  path: '/my-list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WatchedRoute = WatchedRouteImport.update({
+  id: '/watched',
+  path: '/watched',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MovieMovieIdRoute = MovieMovieIdRouteImport.update({
+  id: '/movie/$movieId',
+  path: '/movie/$movieId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/favorites': typeof FavoritesRoute
+  '/my-list': typeof MyListRoute
+  '/profile': typeof ProfileRoute
+  '/watched': typeof WatchedRoute
+  '/movie/$movieId': typeof MovieMovieIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/favorites': typeof FavoritesRoute
+  '/my-list': typeof MyListRoute
+  '/profile': typeof ProfileRoute
+  '/watched': typeof WatchedRoute
+  '/movie/$movieId': typeof MovieMovieIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/favorites': typeof FavoritesRoute
+  '/my-list': typeof MyListRoute
+  '/profile': typeof ProfileRoute
+  '/watched': typeof WatchedRoute
+  '/movie/$movieId': typeof MovieMovieIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/favorites'
+    | '/my-list'
+    | '/profile'
+    | '/watched'
+    | '/movie/$movieId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/favorites'
+    | '/my-list'
+    | '/profile'
+    | '/watched'
+    | '/movie/$movieId'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/favorites'
+    | '/my-list'
+    | '/profile'
+    | '/watched'
+    | '/movie/$movieId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
+  FavoritesRoute: typeof FavoritesRoute
+  MyListRoute: typeof MyListRoute
+  ProfileRoute: typeof ProfileRoute
+  WatchedRoute: typeof WatchedRoute
+  MovieMovieIdRoute: typeof MovieMovieIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +130,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/favorites': {
+      id: '/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-list': {
+      id: '/my-list'
+      path: '/my-list'
+      fullPath: '/my-list'
+      preLoaderRoute: typeof MyListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/watched': {
+      id: '/watched'
+      path: '/watched'
+      fullPath: '/watched'
+      preLoaderRoute: typeof WatchedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/movie/$movieId': {
+      id: '/movie/$movieId'
+      path: '/movie/$movieId'
+      fullPath: '/movie/$movieId'
+      preLoaderRoute: typeof MovieMovieIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
+  FavoritesRoute: FavoritesRoute,
+  MyListRoute: MyListRoute,
+  ProfileRoute: ProfileRoute,
+  WatchedRoute: WatchedRoute,
+  MovieMovieIdRoute: MovieMovieIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
