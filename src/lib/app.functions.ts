@@ -64,6 +64,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
         query: z.string().max(400).default(""),
         excludeIds: z.array(z.number()).default([]),
         seed: z.number().default(0),
+        limit: z.number().min(1).max(24).default(9),
+        similarToMovieId: z.number().nullish(),
       })
       .parse(data),
   )
@@ -79,13 +81,22 @@ export const getRecommendations = createServerFn({ method: "POST" })
 
     let intent: Intent = { positive: {}, negative: {}, summary: "" };
     let notice: string | undefined;
-    if (data.query.trim()) {
+    const anchor = data.similarToMovieId ? MOVIES_BY_ID.get(data.similarToMovieId) : undefined;
+    if (anchor) {
+      intent = {
+        positive: {},
+        negative: {},
+        similar_to: [anchor.title],
+        genres_include: anchor.genres.slice(0, 2),
+        summary: `something like ${anchor.title}`,
+      };
+    } else if (data.query.trim()) {
       const parsed = await interpretIntent(data.query.trim());
       intent = parsed.intent;
       notice = parsed.notice;
     }
 
-    const ranked = rankMovies({ intent, prefs, interactions, excludeIds: data.excludeIds, limit: 9, seed: data.seed });
+    const ranked = rankMovies({ intent, prefs, interactions, excludeIds: anchor ? [...data.excludeIds, anchor.id] : data.excludeIds, limit: data.limit, seed: data.seed });
 
     let searchId: number | null = null;
     if (data.query.trim()) {
