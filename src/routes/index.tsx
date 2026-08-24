@@ -95,7 +95,7 @@ function Home() {
           className="mx-auto mt-8 flex max-w-2xl items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            mutation.mutate(query);
+            run(query);
           }}
         >
           <input
@@ -128,7 +128,17 @@ function Home() {
 
       <div className="mb-6 flex items-baseline justify-between gap-4">
         <h2 className="font-display text-2xl">{mutation.isPending ? "Thinking…" : heading}</h2>
-        <FeedbackDialog trigger="These aren't right" />
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => run(query)}
+            disabled={mutation.isPending}
+            className="text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            Show different picks
+          </button>
+          <FeedbackDialog trigger="These aren't right" />
+        </div>
       </div>
 
       {mutation.isPending ? (
