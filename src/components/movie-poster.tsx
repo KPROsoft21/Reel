@@ -30,16 +30,7 @@ export function MoviePoster({ movie, className }: { movie: Movie; className?: st
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover"
           />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/85 via-background/10 to-transparent" />
-          <span className="relative" />
-          <div className="relative">
-            <h3 className="font-display text-xl leading-[1.05] text-foreground drop-shadow">
-              {movie.title}
-            </h3>
-            <p className="mt-1 text-[0.7rem] uppercase tracking-[0.18em] text-foreground/70">
-              {movie.year} · {movie.runtime}m
-            </p>
-          </div>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/45 via-transparent to-transparent" />
         </>
       ) : (
         <>
