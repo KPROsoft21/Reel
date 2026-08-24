@@ -114,30 +114,34 @@ export function intentMatch(movie: Movie, intent: Intent): { score: number; hard
   if (intent.runtime_min && movie.runtime < intent.runtime_min) hardFail = true;
   if (intent.genres_exclude?.some((g) => movie.genres.includes(g))) hardFail = true;
 
-  const parts: number[] = [];
+  const parts: [number, number][] = []; // [score, weight]
   for (const [k, v] of Object.entries(intent.positive ?? {})) {
     const f = movie.features[k];
     if (f === undefined) continue;
-    parts.push(1 - Math.abs(f - clamp01(v)));
+    const want = clamp01(v);
+    // Reward movies that reach the requested level; only penalise falling short.
+    parts.push([clamp01(1 - Math.max(0, want - f) * 1.6), 1.5 * Math.max(0.3, want)]);
   }
   for (const [k, v] of Object.entries(intent.negative ?? {})) {
     const f = movie.features[k];
     if (f === undefined) continue;
-    parts.push(1 - clamp01(f) * clamp01(Math.abs(v)));
+    parts.push([clamp01(1 - clamp01(f) * clamp01(Math.abs(v))), 1.5]);
   }
   if (intent.genres_include?.length) {
     const hit = intent.genres_include.filter((g) => movie.genres.includes(g)).length;
-    parts.push(clamp01(hit / intent.genres_include.length));
+    parts.push([clamp01(hit / intent.genres_include.length), 2]);
   }
   if (intent.similar_to?.length) {
     const refs = MOVIES.filter((m) =>
       intent.similar_to!.some((t) => m.title.toLowerCase() === t.toLowerCase()),
     );
-    if (refs.length) parts.push(semanticSimilarity(movie, refs));
+    if (refs.length) parts.push([semanticSimilarity(movie, refs), 2.5]);
   }
-  const score = parts.length ? parts.reduce((s, n) => s + n, 0) / parts.length : 0.5;
+  const totalW = parts.reduce((s, [, w]) => s + w, 0);
+  const score = totalW ? parts.reduce((s, [v, w]) => s + v * w, 0) / totalW : 0.5;
   return { score: clamp01(score), hardFail };
 }
+
 
 function themeMatch(movie: Movie, prefs: Preference[]): number {
   const themed = prefs.filter((p) => p.preference_value > 0.25 && p.confidence > 0.2);
