@@ -59,7 +59,13 @@ export const getSnapshot = createServerFn({ method: "GET" })
 export const getRecommendations = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) =>
-    z.object({ query: z.string().max(400).default(""), excludeIds: z.array(z.number()).default([]) }).parse(data),
+    z
+      .object({
+        query: z.string().max(400).default(""),
+        excludeIds: z.array(z.number()).default([]),
+        seed: z.number().default(0),
+      })
+      .parse(data),
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -79,7 +85,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
       notice = parsed.notice;
     }
 
-    const ranked = rankMovies({ intent, prefs, interactions, excludeIds: data.excludeIds, limit: 9 });
+    const ranked = rankMovies({ intent, prefs, interactions, excludeIds: data.excludeIds, limit: 9, seed: data.seed });
 
     let searchId: number | null = null;
     if (data.query.trim()) {
