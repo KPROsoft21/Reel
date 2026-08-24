@@ -167,7 +167,27 @@ export type RankInput = {
   interactions: InteractionState[];
   excludeIds?: number[];
   limit?: number;
+  /** Changes the exploration jitter so repeat asks surface different films. */
+  seed?: number;
 };
+
+/** Deterministic 0..1 pseudo-random from two integers. */
+function jitter(seed: number, id: number): number {
+  const x = Math.sin(seed * 374761393 + id * 668265263) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+function hasIntentSignal(intent: Intent): boolean {
+  return Boolean(
+    Object.keys(intent.positive ?? {}).length ||
+      Object.keys(intent.negative ?? {}).length ||
+      intent.genres_include?.length ||
+      intent.similar_to?.length ||
+      intent.runtime_max ||
+      intent.runtime_min ||
+      intent.exact_title,
+  );
+}
 
 export function rankMovies({
   intent,
@@ -175,6 +195,7 @@ export function rankMovies({
   interactions,
   excludeIds = [],
   limit = 9,
+  seed = 0,
 }: RankInput): ScoredMovie[] {
   const seen = new Map(interactions.map((i) => [i.movie_id, i]));
   const likedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === true);
@@ -183,6 +204,13 @@ export function rankMovies({
   const profileMaturity = clamp01(evidence / 30);
 
   const exactTitle = intent.exact_title?.toLowerCase().trim();
+  const searching = hasIntentSignal(intent);
+
+  // When the viewer states a mood, that request dominates; otherwise the
+  // learned taste model and exploration drive the feed.
+  const W = searching
+    ? { preference: 0.14, semantic: 0.08, theme: 0.05, context: 0.5, rating: 0.06, novelty: 0.03, discovery: 0.04, popularity: 0.04, jitter: 0.03 }
+    : { preference: 0.3, semantic: 0.18, theme: 0.11, context: 0.02, rating: 0.07, novelty: 0.06, discovery: 0.09, popularity: 0.05, jitter: 0.14 };
 
   const scored: ScoredMovie[] = [];
   for (const movie of MOVIES) {
@@ -201,14 +229,15 @@ export function rankMovies({
     const popularity = clamp01(movie.popularity);
 
     let score =
-      0.3 * preference +
-      0.2 * semantic +
-      0.12 * theme +
-      0.1 * ctx.score +
-      0.07 * (movie.rating - 6) / 3 +
-      0.06 * novelty +
-      0.09 * discovery +
-      0.06 * popularity;
+      W.preference * preference +
+      W.semantic * semantic +
+      W.theme * theme +
+      W.context * ctx.score +
+      (W.rating * (movie.rating - 6)) / 3 +
+      W.novelty * novelty +
+      W.discovery * discovery +
+      W.popularity * popularity +
+      W.jitter * jitter(seed, movie.id);
 
     // Penalty: too close to something the user explicitly disliked.
     if (dislikedMovies.length) {
@@ -222,13 +251,14 @@ export function rankMovies({
       score,
       components: { preference, semantic, theme, novelty, discovery, context: ctx.score, popularity },
       reasons: explain(movie, prefs, intent, ctx.score),
-      fit: Math.round(clamp01(0.35 + score * 0.75) * 100),
+      fit: Math.round(clamp01(0.3 + (searching ? ctx.score : score) * 0.75) * 100),
     });
   }
 
   scored.sort((a, b) => b.score - a.score);
   return diversify(scored, limit);
 }
+
 
 /** Avoid nine variations of the same movie: cap repeated dominant genres. */
 function diversify(scored: ScoredMovie[], limit: number): ScoredMovie[] {
