@@ -7,19 +7,6 @@ import type { Intent } from "./recommender";
 
 const MODEL = "google/gemini-3.7-flash";
 
-const featureRecord = z.record(z.enum(FEATURE_KEYS as unknown as [string, ...string[]]), z.number());
-
-const IntentSchema = z.object({
-  exact_title: z.string().nullish().describe("Set only when the user is clearly searching for one specific film by name"),
-  similar_to: z.array(z.string()).nullish().describe("Movie titles the user referenced as a comparison"),
-  positive: featureRecord.nullish().describe("Desired feature levels, 0..1"),
-  negative: featureRecord.nullish().describe("Features to avoid, 0..1 where 1 means strongly avoid"),
-  genres_include: z.array(z.string()).nullish(),
-  genres_exclude: z.array(z.string()).nullish(),
-  runtime_max: z.number().nullish(),
-  runtime_min: z.number().nullish(),
-  summary: z.string().nullish().describe("One short clause describing the mood, e.g. 'a lighter space epic'"),
-});
 
 
 const SYSTEM = `You translate a movie viewer's natural language mood request into structured retrieval signals.
