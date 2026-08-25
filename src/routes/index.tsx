@@ -81,6 +81,7 @@ function Home() {
       if (res.notice) toast.message(res.notice);
       setLastQuery(input.q);
       setLastEntity(input.entity ?? null);
+      setLastEntity(input.entity ?? null);
       setFeed(res.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
     },
