@@ -1,6 +1,6 @@
-
-<img src="src/assets/reel-logo.png" alt="Reel logo" width="160" />
-
+<div align="center">
+  <img src="src/assets/reel-logo.png" alt="Reel logo" width="160" />
+</div>
 
 # Reel — Movie recommendations that learn your taste
 
