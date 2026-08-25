@@ -146,3 +146,94 @@ export async function tmdbSearch(query: string, limit = 4): Promise<Movie[]> {
   return movies.filter((m): m is Movie => !!m);
 }
 
+// ---------------------------------------------------------------------------
+// Entity candidates: people (actors / directors), franchises, studios, keywords.
+// The app asks the viewer which one they meant instead of guessing.
+// ---------------------------------------------------------------------------
+
+export type EntityKind = "actor" | "director" | "franchise" | "studio" | "keyword" | "title";
+export type Candidate = { kind: EntityKind; id: string; label: string; subtitle: string };
+
+const NOISE =
+  /\b(movies?|films?|cinema|directed\s+by|director|starring|stars?|actor|actress|show\s+me|find|give\s+me|universe)\b/gi;
+
+function cleanEntityQuery(q: string) {
+  return q.replace(NOISE, " ").replace(/\s+/g, " ").trim();
+}
+
+async function hydrate(results: Json[], limit: number): Promise<Movie[]> {
+  const picked = results
+    .filter((r) => r["poster_path"] && r["release_date"])
+    .sort((a, b) => Number(b["vote_count"] ?? 0) - Number(a["vote_count"] ?? 0))
+    .slice(0, limit);
+  const movies = await Promise.all(picked.map((r) => tmdbMovie(Number(r["id"]))));
+  return movies.filter((m): m is Movie => !!m);
+}
+
+/** Ranked list of things the query could mean. Empty when nothing matches. */
+export async function tmdbCandidates(rawQuery: string): Promise<Candidate[]> {
+  const q = cleanEntityQuery(rawQuery);
+  if (q.length < 2 || q.split(" ").length > 6) return [];
+
+  const [people, collections, companies, keywords] = await Promise.all([
+    get("/search/person", { query: q, include_adult: "false", language: "en-US" }),
+    get("/search/collection", { query: q, language: "en-US" }),
+    get("/search/company", { query: q }),
+    get("/search/keyword", { query: q }),
+  ]);
+
+  const out: Candidate[] = [];
+
+  for (const p of ((people?.["results"] ?? []) as Json[])
+    .sort((a, b) => Number(b["popularity"] ?? 0) - Number(a["popularity"] ?? 0))
+    .slice(0, 3)) {
+    const known = ((p["known_for"] ?? []) as Json[]).map((k) => String(k["title"] ?? k["name"] ?? "")).filter(Boolean);
+    const kind: EntityKind = String(p["known_for_department"]) === "Directing" ? "director" : "actor";
+    out.push({
+      kind,
+      id: String(p["id"]),
+      label: String(p["name"] ?? ""),
+      subtitle: known.length ? `${kind === "director" ? "Director" : "Actor"} — ${known.slice(0, 2).join(", ")}` : kind === "director" ? "Director" : "Actor",
+    });
+  }
+
+  for (const c of ((collections?.["results"] ?? []) as Json[]).slice(0, 2)) {
+    out.push({ kind: "franchise", id: String(c["id"]), label: String(c["name"] ?? q), subtitle: "Film series" });
+  }
+
+  for (const c of ((companies?.["results"] ?? []) as Json[]).slice(0, 2)) {
+    out.push({ kind: "studio", id: String(c["id"]), label: String(c["name"] ?? q), subtitle: "Studio" });
+  }
+
+  const kw = ((keywords?.["results"] ?? []) as Json[])[0];
+  if (kw) out.push({ kind: "keyword", id: String(kw["id"]), label: String(kw["name"] ?? q), subtitle: "Theme" });
+
+  return out.slice(0, 8);
+}
+
+/** Films for a chosen candidate. */
+export async function tmdbEntityMovies(kind: EntityKind, id: string, limit = 6): Promise<Movie[]> {
+  if (kind === "actor" || kind === "director") {
+    const credits = await get(`/person/${id}/movie_credits`, { language: "en-US" });
+    const pool =
+      kind === "director"
+        ? ((credits?.["crew"] ?? []) as Json[]).filter((c) => c["job"] === "Director")
+        : ((credits?.["cast"] ?? []) as Json[]);
+    return hydrate(pool, limit);
+  }
+  if (kind === "franchise") {
+    const detail = await get(`/collection/${id}`, { language: "en-US" });
+    return hydrate((detail?.["parts"] ?? []) as Json[], limit);
+  }
+  const query =
+    kind === "studio"
+      ? { with_companies: id, "vote_count.gte": "200" }
+      : { with_keywords: id, "vote_count.gte": "150" };
+  const disc = await get("/discover/movie", {
+    ...query,
+    sort_by: "vote_count.desc",
+    include_adult: "false",
+    language: "en-US",
+  });
+  return hydrate((disc?.["results"] ?? []) as Json[], limit);
+}
