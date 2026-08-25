@@ -345,7 +345,9 @@ export function rankMovies({
     if (excludeIds.includes(movie.id)) continue;
     if (!matchesFilters(movie, filters)) continue;
     const state = seen.get(movie.id);
-    if (state?.watched || state?.liked === false) continue;
+    // Already engaged with (watched, liked or disliked) — never recommend again.
+    if (state?.watched || state?.liked !== null && state?.liked !== undefined) continue;
+
 
     const ctx = intentMatch(movie, intent);
     if (ctx.hardFail) continue;
