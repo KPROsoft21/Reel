@@ -109,7 +109,7 @@ function toMovie(d: Json): Movie | null {
   const keywords = ((d["keywords"]?.keywords ?? []) as Json[]).map((k) => String(k["name"]).toLowerCase());
   const director = ((d["credits"]?.crew ?? []) as Json[]).find((c) => c["job"] === "Director")?.["name"];
   const release = String(d["release_date"] ?? "");
-  return {
+  const movie: Movie = {
     id: Number(d["id"]),
     title: String(d["title"]),
     year: release ? Number(release.slice(0, 4)) : 0,
@@ -122,6 +122,8 @@ function toMovie(d: Json): Movie | null {
     rating: r2(Number(d["vote_average"] ?? 6.5)),
     poster: IMG + d["poster_path"],
   };
+  movie.features = { ...movie.features, ...deriveExtendedFeatures({ ...movie, keywords }) };
+  return movie;
 }
 
 const cache = new Map<number, Movie>();
