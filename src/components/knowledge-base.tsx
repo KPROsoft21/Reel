@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sparkles, Trash2 } from "lucide-react";
 
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { useAddKnowledge, useDeleteKnowledge, useKnowledge, useToggleKnowledge } from "@/hooks/use-knowledge";
 import { FEATURE_LABELS } from "@/lib/recommender";
 import type { KnowledgeEntry } from "@/lib/knowledge.functions";
