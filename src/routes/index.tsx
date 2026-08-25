@@ -107,6 +107,34 @@ function Home() {
       }),
   });
 
+  const more = useMutation({
+    mutationFn: (input: { exclude: number[] }) =>
+      recommend({
+        data: {
+          query: lastQuery,
+          excludeIds: input.exclude,
+          seed: Math.floor(Math.random() * 100000),
+          limit: 9,
+          entity: lastEntity ? { kind: lastEntity.kind, id: lastEntity.id, label: lastEntity.label } : null,
+          filters,
+        },
+      }),
+    onSuccess: (res) => {
+      registerMovies(res.extras);
+      setFeed((current) => {
+        const seen = new Set(current.map((i) => i.movieId));
+        const additions = res.items
+          .filter((i) => !seen.has(i.movieId))
+          .map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons }));
+        if (!additions.length) toast.message("No more matches for that search.");
+        return [...current, ...additions];
+      });
+    },
+    onError: () => toast.error("Couldn't load more. Try again."),
+  });
+
+  const loadMore = () => more.mutate({ exclude: [...dismissed, ...feed.map((i) => i.movieId)] });
+
   const run = (q: string, entity?: Option | null) =>
     mutation.mutate({ q, entity: entity ?? null, seed: Math.floor(Math.random() * 100000) });
 
@@ -282,11 +310,25 @@ function Home() {
           ))}
         </div>
       ) : (
-        <MovieGrid
-          items={items}
-          onRemove={onRemove}
-          empty="No matches for that. Try loosening the constraints."
-        />
+        <>
+          <MovieGrid
+            items={items}
+            onRemove={onRemove}
+            empty="No matches for that. Try loosening the constraints."
+          />
+          {items.length > 0 && (
+            <div className="mt-10 flex justify-center">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={more.isPending}
+                className="chamfer hairline bg-surface px-6 py-3 text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                {more.isPending ? "Loading…" : "More like these"}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
