@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as MyListRouteImport } from './routes/my-list'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as SwipeRouteImport } from './routes/swipe'
 import { Route as WatchedRouteImport } from './routes/watched'
 import { Route as MovieMovieIdRouteImport } from './routes/movie.$movieId'
 
@@ -42,6 +43,11 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SwipeRoute = SwipeRouteImport.update({
+  id: '/swipe',
+  path: '/swipe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WatchedRoute = WatchedRouteImport.update({
   id: '/watched',
   path: '/watched',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/favorites': typeof FavoritesRoute
   '/my-list': typeof MyListRoute
   '/profile': typeof ProfileRoute
+  '/swipe': typeof SwipeRoute
   '/watched': typeof WatchedRoute
   '/movie/$movieId': typeof MovieMovieIdRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/favorites': typeof FavoritesRoute
   '/my-list': typeof MyListRoute
   '/profile': typeof ProfileRoute
+  '/swipe': typeof SwipeRoute
   '/watched': typeof WatchedRoute
   '/movie/$movieId': typeof MovieMovieIdRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/favorites': typeof FavoritesRoute
   '/my-list': typeof MyListRoute
   '/profile': typeof ProfileRoute
+  '/swipe': typeof SwipeRoute
   '/watched': typeof WatchedRoute
   '/movie/$movieId': typeof MovieMovieIdRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/favorites'
     | '/my-list'
     | '/profile'
+    | '/swipe'
     | '/watched'
     | '/movie/$movieId'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/favorites'
     | '/my-list'
     | '/profile'
+    | '/swipe'
     | '/watched'
     | '/movie/$movieId'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/favorites'
     | '/my-list'
     | '/profile'
+    | '/swipe'
     | '/watched'
     | '/movie/$movieId'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   FavoritesRoute: typeof FavoritesRoute
   MyListRoute: typeof MyListRoute
   ProfileRoute: typeof ProfileRoute
+  SwipeRoute: typeof SwipeRoute
   WatchedRoute: typeof WatchedRoute
   MovieMovieIdRoute: typeof MovieMovieIdRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/swipe': {
+      id: '/swipe'
+      path: '/swipe'
+      fullPath: '/swipe'
+      preLoaderRoute: typeof SwipeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/watched': {
       id: '/watched'
       path: '/watched'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   FavoritesRoute: FavoritesRoute,
   MyListRoute: MyListRoute,
   ProfileRoute: ProfileRoute,
+  SwipeRoute: SwipeRoute,
   WatchedRoute: WatchedRoute,
   MovieMovieIdRoute: MovieMovieIdRoute,
 }
