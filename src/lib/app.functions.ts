@@ -276,7 +276,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
       prefs,
       interactions,
       knowledge,
-      excludeIds: [...data.excludeIds, ...hitIds, ...(anchor ? [anchor.id] : [])],
+      excludeIds: [...data.excludeIds, ...hitIds, ...engagedIds, ...(anchor ? [anchor.id] : [])],
       limit: fillLimit,
       seed: data.seed,
       filters,
