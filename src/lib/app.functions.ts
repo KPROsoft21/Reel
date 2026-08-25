@@ -125,7 +125,10 @@ export const getRecommendations = createServerFn({ method: "POST" })
     // The viewer explicitly picked what they meant (actor, director, franchise,
     // studio or theme) — no guessing.
     const entity = data.entity ?? null;
-    if (entity) {
+    if (entity?.kind === "title") {
+      const picked = MOVIES_BY_ID.get(Number(entity.id)) ?? (await tmdbMovie(Number(entity.id)));
+      if (picked) titleHits = [picked];
+    } else if (entity) {
       const entityMovies = await tmdbEntityMovies(entity.kind, entity.id, 8);
       titleHits = entityMovies.filter((m) => !data.excludeIds.includes(m.id)).slice(0, 6);
     }
@@ -147,6 +150,15 @@ export const getRecommendations = createServerFn({ method: "POST" })
         similar_to: [anchor.title],
         genres_include: anchor.genres.slice(0, 2),
         summary: `something like ${anchor.title}`,
+      };
+    } else if (entity?.kind === "title" && topHit) {
+      intent = {
+        positive: {},
+        negative: {},
+        similar_to: [topHit.title],
+        genres_include: topHit.genres.slice(0, 2),
+        summary: `${topHit.title} and films like it`,
+        exact_title: topHit.title,
       };
     } else if (entity && topHit) {
       intent = {
