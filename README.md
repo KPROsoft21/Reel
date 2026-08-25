@@ -2,6 +2,8 @@
 
 # Reel — Movie recommendations that learn your taste
 
+<img src="src/assets/reel-logo.png" alt="Reel logo" width="160" />
+
 > A personalized film recommender. Ask for what you're in the mood for, swipe through picks, or dive into a single film — every like, save, watch and skip feeds a taste model that gets sharper the more you use it.
 
 ## What it does
