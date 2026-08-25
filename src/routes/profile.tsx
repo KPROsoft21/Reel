@@ -6,6 +6,8 @@ import { KnowledgeBase } from "@/components/knowledge-base";
 import { RequireAuth } from "@/components/require-auth";
 
 import { useProfileUpdate, useSnapshot, useTagCorrection } from "@/hooks/use-app-data";
+import { FEATURE_LABELS } from "@/lib/recommender";
+
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -39,11 +41,47 @@ function Profile() {
     }
   }, [data?.profile]);
 
-  const tags = data?.tags ?? [];
+  const prefs = data?.preferences ?? [];
+  const loves = prefs
+    .filter((p) => p.preference_value > 0.1 && p.confidence > 0.05)
+    .sort((a, b) => b.preference_value * b.confidence - a.preference_value * a.confidence);
+  const avoids = prefs
+    .filter((p) => p.preference_value < -0.1 && p.confidence > 0.05)
+    .sort((a, b) => a.preference_value * a.confidence - b.preference_value * b.confidence);
+  const evidence = prefs.reduce((n, p) => n + p.evidence_count, 0);
   const stats = {
     watched: (data?.interactions ?? []).filter((i) => i.watched).length,
     liked: (data?.interactions ?? []).filter((i) => i.liked === true).length,
     list: (data?.watchlist ?? []).filter((w) => w.status === "want_to_watch").length,
+  };
+
+  const Row = ({ p, kind }: { p: (typeof prefs)[number]; kind: "love" | "avoid" }) => {
+    const strength = Math.min(1, Math.abs(p.preference_value) * (0.4 + 0.6 * p.confidence));
+    return (
+      <div className="chamfer-sm hairline flex items-center gap-3 bg-surface px-3 py-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-sm text-foreground/90">{FEATURE_LABELS[p.feature_key] ?? p.feature_key}</span>
+            <span className="shrink-0 text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">
+              {Math.round(strength * 100)}% · {p.evidence_count} signal{p.evidence_count === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="mt-1.5 h-1 w-full bg-background">
+            <div
+              className={kind === "love" ? "h-1 bg-primary" : "h-1 bg-destructive"}
+              style={{ width: `${Math.max(6, strength * 100)}%` }}
+            />
+          </div>
+        </div>
+        <button
+          aria-label={`Remove ${FEATURE_LABELS[p.feature_key] ?? p.feature_key}`}
+          onClick={() => correct.mutate({ featureKey: p.feature_key, keep: false })}
+          className="shrink-0 text-muted-foreground hover:text-destructive"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -76,30 +114,41 @@ function Profile() {
       <section className="mb-10">
         <h2 className="font-display text-2xl">What we've learned</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Remove anything that doesn't sound like you — the recommender adjusts immediately.
+          Live from your taste model — {prefs.length} feature{prefs.length === 1 ? "" : "s"} learned from {evidence}{" "}
+          signal{evidence === 1 ? "" : "s"}. Remove anything that doesn't sound like you; the recommender adjusts
+          immediately.
         </p>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {tags.length ? (
-            tags.map((tag) => (
-              <span
-                key={tag.key}
-                className="chamfer-sm hairline flex items-center gap-2 bg-surface px-3 py-2 text-xs text-foreground/85"
-              >
-                {tag.label}
-                <button
-                  aria-label={`Remove ${tag.label}`}
-                  onClick={() => correct.mutate({ featureKey: tag.key, keep: false })}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </span>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">Nothing yet — rate a few films and your taste model appears here.</p>
-          )}
-        </div>
+
+        {loves.length === 0 && avoids.length === 0 ? (
+          <p className="mt-5 text-sm text-muted-foreground">
+            Nothing yet — rate a few films and your taste model appears here.
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-6 sm:grid-cols-2">
+            <div>
+              <p className="mb-2 text-[0.6rem] uppercase tracking-[0.25em] text-muted-foreground">Drawn to</p>
+              <div className="space-y-2">
+                {loves.length ? (
+                  loves.map((p) => <Row key={p.feature_key} p={p} kind="love" />)
+                ) : (
+                  <p className="text-sm text-muted-foreground">No positive signals yet.</p>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-[0.6rem] uppercase tracking-[0.25em] text-muted-foreground">Steering away from</p>
+              <div className="space-y-2">
+                {avoids.length ? (
+                  avoids.map((p) => <Row key={p.feature_key} p={p} kind="avoid" />)
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nothing ruled out yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </section>
+
 
       <div className="mb-10">
         <KnowledgeBase />
