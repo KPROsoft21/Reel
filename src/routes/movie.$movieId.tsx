@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
 
 import { RequireAuth } from "@/components/require-auth";
@@ -202,7 +202,7 @@ function MovieDetail() {
 
       <section className="mt-16">
         <h2 className="mb-6 font-display text-2xl">More like {movie.title}</h2>
-        <MovieGrid items={similar} />
+        <MovieGrid items={similar} onRemove={onRemove} />
       </section>
     </article>
   );
