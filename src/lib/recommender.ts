@@ -187,12 +187,79 @@ function discoveryValue(movie: Movie, prefs: Preference[], profileMaturity: numb
   return clamp01(informational * (1 - profileMaturity * 0.6));
 }
 
+/** Score a movie against the viewer's authored knowledge base. */
+export function knowledgeMatch(
+  movie: Movie,
+  rules: KnowledgeSignals[],
+): { score: number; hardFail: boolean; reasons: string[] } {
+  if (!rules.length) return { score: 0.5, hardFail: false, reasons: [] };
+  const haystack = `${movie.title} ${movie.overview} ${movie.director} ${movie.genres.join(" ")}`.toLowerCase();
+  const people = `${movie.director} ${movie.overview}`.toLowerCase();
+  let score = 0.5;
+  let hardFail = false;
+  const reasons: string[] = [];
+
+  for (const r of rules) {
+    for (const g of r.genres_love) {
+      if (movie.genres.includes(g)) {
+        score += 0.22;
+        reasons.push(`You told us you like ${g.toLowerCase()} films`);
+      }
+    }
+    for (const g of r.genres_avoid) {
+      if (movie.genres.includes(g)) {
+        score -= 0.35;
+        if (r.strict) hardFail = true;
+      }
+    }
+    for (const p of r.people_love) {
+      if (p.length > 2 && people.includes(p.toLowerCase())) {
+        score += 0.25;
+        reasons.push(`Features ${p}, who you said you like`);
+      }
+    }
+    for (const p of r.people_avoid) {
+      if (p.length > 2 && people.includes(p.toLowerCase())) {
+        score -= 0.35;
+        if (r.strict) hardFail = true;
+      }
+    }
+    for (const k of r.keywords_love) {
+      if (k.length > 2 && haystack.includes(k)) {
+        score += 0.14;
+        reasons.push(`Matches your note about ${k}`);
+      }
+    }
+    for (const k of r.keywords_avoid) {
+      if (k.length > 2 && haystack.includes(k)) {
+        score -= 0.2;
+        if (r.strict) hardFail = true;
+      }
+    }
+    for (const [key, w] of Object.entries(r.positive)) {
+      const f = movie.features[key];
+      if (f === undefined) continue;
+      score += 0.2 * w * (f - 0.5) * 2;
+      if (f > 0.7 && w > 0.4) reasons.push(`${FEATURE_LABELS[key] ?? key}, which you asked for`);
+    }
+    for (const [key, w] of Object.entries(r.negative)) {
+      const f = movie.features[key];
+      if (f === undefined) continue;
+      score -= 0.2 * w * (f - 0.5) * 2;
+    }
+  }
+
+  return { score: clamp01(score), hardFail, reasons: [...new Set(reasons)].slice(0, 2) };
+}
+
 export type RankInput = {
   intent: Intent;
   prefs: Preference[];
   interactions: InteractionState[];
   excludeIds?: number[];
   limit?: number;
+  /** Durable rules the viewer wrote into their knowledge base. */
+  knowledge?: KnowledgeSignals[];
   /** Changes the exploration jitter so repeat asks surface different films. */
   seed?: number;
 };
@@ -221,6 +288,7 @@ export function rankMovies({
   interactions,
   excludeIds = [],
   limit = 9,
+  knowledge = [],
   seed = 0,
 }: RankInput): ScoredMovie[] {
   const seen = new Map(interactions.map((i) => [i.movie_id, i]));
@@ -231,12 +299,14 @@ export function rankMovies({
 
   const exactTitle = intent.exact_title?.toLowerCase().trim();
   const searching = hasIntentSignal(intent);
+  const hasKnowledge = knowledge.length > 0;
 
   // When the viewer states a mood, that request dominates; otherwise the
-  // learned taste model and exploration drive the feed.
+  // learned taste model, their written rules and exploration drive the feed.
   const W = searching
-    ? { preference: 0.14, semantic: 0.08, theme: 0.05, context: 0.5, rating: 0.06, novelty: 0.03, discovery: 0.04, popularity: 0.04, jitter: 0.03 }
-    : { preference: 0.3, semantic: 0.18, theme: 0.11, context: 0.02, rating: 0.07, novelty: 0.06, discovery: 0.09, popularity: 0.05, jitter: 0.14 };
+    ? { preference: 0.12, semantic: 0.07, theme: 0.04, context: 0.46, rating: 0.06, novelty: 0.03, discovery: 0.04, popularity: 0.03, knowledge: hasKnowledge ? 0.12 : 0, jitter: 0.03 }
+    : { preference: 0.26, semantic: 0.15, theme: 0.09, context: 0.02, rating: 0.06, novelty: 0.05, discovery: 0.08, popularity: 0.04, knowledge: hasKnowledge ? 0.24 : 0, jitter: hasKnowledge ? 0.11 : 0.14 };
+
 
   const scored: ScoredMovie[] = [];
   for (const movie of MOVIES) {
