@@ -399,20 +399,22 @@ async function learnFrom(
   const { data } = await supabase.from("user_preferences").select("*").eq("user_id", userId);
   const deltas = applyEvidence(asPrefs(data ?? []), movie, direction, evidenceType);
   if (!deltas.length) return;
-  await supabase.from("user_preferences").upsert(
-    deltas.map((d) => ({ user_id: userId, ...d, last_updated: new Date().toISOString() })),
-    { onConflict: "user_id,feature_key" },
-  );
-  await supabase.from("user_preference_evidence").insert(
-    deltas.slice(0, 6).map((d) => ({
-      user_id: userId,
-      feature_key: d.feature_key,
-      movie_id: movieId,
-      evidence_type: evidenceType,
-      evidence_value: direction,
-      confidence: d.confidence,
-    })),
-  );
+  await Promise.all([
+    supabase.from("user_preferences").upsert(
+      deltas.map((d) => ({ user_id: userId, ...d, last_updated: new Date().toISOString() })),
+      { onConflict: "user_id,feature_key" },
+    ),
+    supabase.from("user_preference_evidence").insert(
+      deltas.slice(0, 6).map((d) => ({
+        user_id: userId,
+        feature_key: d.feature_key,
+        movie_id: movieId,
+        evidence_type: evidenceType,
+        evidence_value: direction,
+        confidence: d.confidence,
+      })),
+    ),
+  ]);
 }
 
 const ActionSchema = z.object({
