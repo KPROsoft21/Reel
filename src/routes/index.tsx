@@ -10,6 +10,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { EMPTY_FILTERS, type MovieFilters } from "@/lib/filters";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { getRecommendations, getSearchOptions } from "@/lib/app.functions";
+import { FEATURE_LABELS } from "@/lib/recommender";
 import { registerMovies } from "@/lib/movie-registry";
 import { useSnapshot } from "@/hooks/use-app-data";
 import { toast } from "sonner";
