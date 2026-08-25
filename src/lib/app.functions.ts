@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
 import { searchTitles, titleMatchScore } from "./title-search";
-import { tmdbEntitySearch, tmdbMovie, tmdbSearch, type EntityResult } from "./tmdb.server";
+import { tmdbCandidates, tmdbEntityMovies, tmdbMovie, tmdbSearch, type EntityKind } from "./tmdb.server";
 
 import {
   ALGORITHM_VERSION,
@@ -82,6 +82,13 @@ export const getRecommendations = createServerFn({ method: "POST" })
         seed: z.number().default(0),
         limit: z.number().min(1).max(24).default(9),
         similarToMovieId: z.number().nullish(),
+        entity: z
+          .object({
+            kind: z.enum(["actor", "director", "franchise", "studio", "keyword", "title"]),
+            id: z.string(),
+            label: z.string(),
+          })
+          .nullish(),
       })
       .parse(data),
   )
@@ -106,8 +113,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
     // A typed title is a direct lookup: show the film itself, then films like it.
     // Local catalog first, then all of TMDB so every film is reachable.
     const q = data.query.trim();
-    let titleHits = anchor || !q ? [] : searchTitles(q).filter((m) => !data.excludeIds.includes(m.id));
-    if (!anchor && q.length >= 2) {
+    let titleHits = anchor || !q || data.entity ? [] : searchTitles(q).filter((m) => !data.excludeIds.includes(m.id));
+    if (!anchor && !data.entity && q.length >= 2) {
       const remote = await tmdbSearch(q, 6);
       const known = new Set([...titleHits.map((m) => m.id), ...data.excludeIds]);
       const extraHits = remote
@@ -150,7 +157,6 @@ export const getRecommendations = createServerFn({ method: "POST" })
         summary: `${entity.label} films`,
         exact_title: entity.label,
       };
-    }
     } else if (topHit) {
       intent = {
         positive: {},
@@ -502,4 +508,30 @@ export const getMovieDetails = createServerFn({ method: "POST" })
     if (local) return { movie: local };
     const remote = await tmdbMovie(data.movieId);
     return { movie: remote };
+  });
+
+/**
+ * What could this query mean? Returns the matching films plus people,
+ * franchises, studios and themes so the viewer can confirm instead of the
+ * app guessing.
+ */
+export const getSearchOptions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ query: z.string().min(1).max(200) }).parse(data))
+  .handler(async ({ data }) => {
+    const q = data.query.trim();
+    const [local, remote, candidates] = await Promise.all([
+      Promise.resolve(searchTitles(q, 3)),
+      tmdbSearch(q, 4),
+      tmdbCandidates(q),
+    ]);
+
+    const seen = new Set<number>();
+    const titles = [...local, ...remote]
+      .filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)))
+      .filter((m) => titleMatchScore(q, m.title) >= 0.5)
+      .slice(0, 4)
+      .map((m) => ({ kind: "title" as EntityKind, id: String(m.id), label: m.title, subtitle: `Film — ${m.year}` }));
+
+    return { titles, candidates };
   });
