@@ -357,4 +357,3 @@ This repository is connected to Lovable. Avoid force pushes, rebases, amend comm
 - [TanStack Start](https://tanstack.com/start)
 - [Supabase](https://supabase.com/docs)
 - [TMDB API](https://developer.themoviedb.org/reference)
-- [Lovable](https://lovable.dev)
