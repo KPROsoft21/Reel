@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { KnowledgeBase } from "@/components/knowledge-base";
 import { RequireAuth } from "@/components/require-auth";
 
@@ -62,7 +63,7 @@ function Profile() {
   const Row = ({ p, kind }: { p: (typeof prefs)[number]; kind: "love" | "avoid" }) => {
     const strength = Math.min(1, Math.abs(p.preference_value) * (0.4 + 0.6 * p.confidence));
     return (
-      <div className="chamfer-sm hairline flex items-center gap-3 bg-surface px-3 py-2.5">
+      <div className="chamfer-sm hairline flex items-center gap-3 bg-background px-3 py-2.5">
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <span className="truncate text-sm text-foreground/90">{FEATURE_LABELS[p.feature_key] ?? p.feature_key}</span>
@@ -157,21 +158,16 @@ function Profile() {
         </div>
       </section>
 
-      <section className="mb-10">
-        <h2 className="font-display text-2xl">What we've learned</h2>
-
-        <p className="mt-1 text-sm text-muted-foreground">
-          Live from your taste model — {prefs.length} feature{prefs.length === 1 ? "" : "s"} learned from {evidence}{" "}
-          signal{evidence === 1 ? "" : "s"}. Remove anything that doesn't sound like you; the recommender adjusts
-          immediately.
-        </p>
-
+      <CollapsibleSection
+        title="What we've learned"
+        description={`Live from your taste model — ${prefs.length} feature${prefs.length === 1 ? "" : "s"} learned from ${evidence} signal${evidence === 1 ? "" : "s"}. Remove anything that doesn't sound like you; the recommender adjusts immediately.`}
+      >
         {loves.length === 0 && avoids.length === 0 ? (
-          <p className="mt-5 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Nothing yet — rate a few films and your taste model appears here.
           </p>
         ) : (
-          <div className="mt-5 grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-6 sm:grid-cols-2">
             <div>
               <p className="mb-2 text-[0.6rem] uppercase tracking-[0.25em] text-muted-foreground">Drawn to</p>
               <div className="space-y-2">
@@ -194,7 +190,7 @@ function Profile() {
             </div>
           </div>
         )}
-      </section>
+      </CollapsibleSection>
 
 
       <div className="mb-10">

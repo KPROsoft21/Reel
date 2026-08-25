@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Sparkles, Trash2 } from "lucide-react";
 
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { useAddKnowledge, useDeleteKnowledge, useKnowledge, useToggleKnowledge } from "@/hooks/use-knowledge";
 import { FEATURE_LABELS } from "@/lib/recommender";
 import type { KnowledgeEntry } from "@/lib/knowledge.functions";
@@ -40,14 +41,11 @@ export function KnowledgeBase() {
   };
 
   return (
-    <section>
-      <h2 className="font-display text-2xl">Knowledge base</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Tell the recommender anything about your taste in plain language. It summarises each note and applies it to every
-        future pick.
-      </p>
-
-      <div className="chamfer hairline mt-5 bg-surface p-5">
+    <CollapsibleSection
+      title="Knowledge base"
+      description="Tell the recommender anything about your taste in plain language. It summarises each note and applies it to every future pick."
+    >
+      <div className="chamfer hairline bg-background p-5">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -89,7 +87,7 @@ export function KnowledgeBase() {
           entries.map((entry) => (
             <article
               key={entry.id}
-              className={`chamfer hairline bg-surface p-4 transition-opacity ${entry.active ? "" : "opacity-50"}`}
+              className={`chamfer hairline bg-background p-4 transition-opacity ${entry.active ? "" : "opacity-50"}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -125,6 +123,6 @@ export function KnowledgeBase() {
           ))
         )}
       </div>
-    </section>
+    </CollapsibleSection>
   );
 }
