@@ -22,6 +22,32 @@ export type Preference = {
   evidence_count: number;
 };
 
+/** A durable, user-authored rule distilled from a knowledge-base note. */
+export type KnowledgeSignals = {
+  positive: Record<string, number>;
+  negative: Record<string, number>;
+  genres_love: string[];
+  genres_avoid: string[];
+  people_love: string[];
+  people_avoid: string[];
+  keywords_love: string[];
+  keywords_avoid: string[];
+  strict: boolean;
+};
+
+export const EMPTY_SIGNALS: KnowledgeSignals = {
+  positive: {},
+  negative: {},
+  genres_love: [],
+  genres_avoid: [],
+  people_love: [],
+  people_avoid: [],
+  keywords_love: [],
+  keywords_avoid: [],
+  strict: false,
+};
+
+
 export type InteractionState = {
   movie_id: number;
   watched: boolean;
