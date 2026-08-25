@@ -368,15 +368,25 @@ export function rankMovies({
     }
     // Dismissed with the X: sink it to the bottom of the pile instead of removing it.
     score -= notInterestedPenalty(state);
-    if (exactTitle && movie.title.toLowerCase().includes(exactTitle)) score += 1;
+    const isExact = Boolean(exactTitle && movie.title.toLowerCase().includes(exactTitle));
+    if (isExact) score += 1;
+
+    // Fit is a calibrated read of the blended score, not of any single signal.
+    // Normalising against the weight budget keeps the displayed range honest
+    // (an entity search alone no longer pins everything at 100%).
+    const budget =
+      W.preference + W.semantic + W.theme + W.context + W.knowledge + W.novelty + W.discovery + W.popularity;
+    const quality = clamp01((score - W.jitter * jitter(seed, movie.id)) / (budget * 0.82));
+    const fit = isExact ? 99 : Math.round(28 + 66 * Math.pow(quality, 0.85));
 
     scored.push({
       movie,
       score,
       components: { preference, semantic, theme, novelty, discovery, context: ctx.score, popularity },
       reasons: [...kb.reasons, ...explain(movie, prefs, intent, ctx.score)].slice(0, 3),
-      fit: Math.round(clamp01(0.3 + (searching ? ctx.score : score) * 0.75) * 100),
+      fit,
     });
+
 
   }
 

@@ -199,13 +199,19 @@ export const getRecommendations = createServerFn({ method: "POST" })
       seed: data.seed,
     });
 
-    const hitScored = titleHits.map((movie) => ({
+    const hitScored = titleHits.map((movie, i) => ({
       movie,
-      score: 2,
+      score: 2 - i * 0.01,
       components: { preference: 0, semantic: 1, theme: 0, novelty: 0, discovery: 0, context: 1, popularity: movie.popularity },
       reasons: [entity ? `${entityReason[entity.kind]} ${entity.label}` : "Matches the title you searched"],
-      fit: 100,
+      // Direct matches rank first, but the % still reflects how strong the
+      // match is (rank in the result set + the film's own standing).
+      fit: Math.max(
+        62,
+        Math.min(99, Math.round(97 - i * 3 + (movie.rating - 7) * 2)),
+      ),
     }));
+
 
     const ranked = [...hitScored, ...filler].slice(0, data.limit);
     const extras = ranked.map((r) => r.movie).filter((m) => !MOVIES_BY_ID.has(m.id));
