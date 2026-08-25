@@ -697,3 +697,56 @@ export const getSearchOptions = createServerFn({ method: "POST" })
 
     return { titles, candidates };
   });
+
+/**
+ * Re-score one film against the viewer's current taste model so the detail
+ * page can show exactly why it was recommended.
+ */
+export const explainPick = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ movieId: z.number() }).parse(data))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const movie = MOVIES_BY_ID.get(data.movieId) ?? (await tmdbMovie(data.movieId));
+    if (!movie) return { breakdown: null, fit: null, reasons: [] as string[] };
+
+    const [prefsRes, interactionsRes, knowledgeRes, affinityRes] = await Promise.all([
+      supabase.from("user_preferences").select("*").eq("user_id", userId),
+      supabase
+        .from("user_movie_interactions")
+        .select("movie_id, watched, liked, not_interested_at, not_interested_count")
+        .eq("user_id", userId),
+      supabase.from("user_knowledge").select("signals").eq("user_id", userId).eq("active", true),
+      supabase.from("user_filter_affinity").select("*").eq("user_id", userId).maybeSingle(),
+    ]);
+
+    const row = affinityRes.data as
+      | { decade_counts: unknown; genre_counts: unknown; rating_min_avg: number | null; runtime_max_avg: number | null; uses: number }
+      | null;
+    const nums = (v: unknown): Record<string, number> =>
+      v && typeof v === "object" && !Array.isArray(v)
+        ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, n]) => [k, Number(n) || 0]))
+        : {};
+    const affinity: FilterAffinity = row
+      ? {
+          decades: nums(row.decade_counts),
+          genres: nums(row.genre_counts),
+          ratingMin: row.rating_min_avg === null ? null : Number(row.rating_min_avg),
+          runtimeMax: row.runtime_max_avg === null ? null : Number(row.runtime_max_avg),
+          uses: Number(row.uses ?? 0),
+        }
+      : EMPTY_AFFINITY;
+
+    const [scored] = rankMovies({
+      intent: { positive: {}, negative: {}, summary: "" },
+      prefs: asPrefs(prefsRes.data ?? []),
+      interactions: asInteractions(interactionsRes.data ?? []),
+      knowledge: (knowledgeRes.data ?? []).map((r) => toSignals(r.signals)),
+      affinity,
+      only: [movie],
+    });
+
+    return scored
+      ? { breakdown: scored.breakdown, fit: scored.fit, reasons: scored.reasons }
+      : { breakdown: null, fit: null, reasons: [] as string[] };
+  });
