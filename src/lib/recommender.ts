@@ -324,7 +324,10 @@ export type RankInput = {
   filters?: MovieFilters | null;
   /** Learned filtering habits: a soft lean, applied even when no filter is set. */
   affinity?: FilterAffinity | null;
+  /** Score exactly these films, bypassing exclusions — used to explain a single pick. */
+  only?: Movie[];
 };
+
 
 /** Deterministic 0..1 pseudo-random from two integers. */
 function jitter(seed: number, id: number): number {
@@ -407,7 +410,10 @@ export function rankMovies({
   seed = 0,
   filters = null,
   affinity = null,
+  only,
 }: RankInput): ScoredMovie[] {
+  const forced = only && only.length ? only : null;
+
   const seen = new Map(interactions.map((i) => [i.movie_id, i]));
   const likedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === true);
   const dislikedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === false);
@@ -428,19 +434,23 @@ export function rankMovies({
 
 
   const scored: ScoredMovie[] = [];
-  for (const movie of MOVIES) {
-    if (excludeIds.includes(movie.id)) continue;
-    if (!matchesFilters(movie, filters)) continue;
+  for (const movie of forced ?? MOVIES) {
+    if (!forced) {
+      if (excludeIds.includes(movie.id)) continue;
+      if (!matchesFilters(movie, filters)) continue;
+    }
     const state = seen.get(movie.id);
     // Already engaged with (watched, liked or disliked) — never recommend again.
-    if (state?.watched || state?.liked !== null && state?.liked !== undefined) continue;
+    if (!forced && (state?.watched || (state?.liked !== null && state?.liked !== undefined))) continue;
+
 
 
     const ctx = intentMatch(movie, intent);
-    if (ctx.hardFail) continue;
+    if (ctx.hardFail && !forced) continue;
 
     const kb = knowledgeMatch(movie, knowledge);
-    if (kb.hardFail) continue;
+    if (kb.hardFail && !forced) continue;
+
 
     const preference = preferenceMatch(movie, prefs);
     const semantic = semanticSimilarity(movie, likedMovies);
@@ -527,7 +537,7 @@ export function rankMovies({
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return diversify(scored, limit);
+  return forced ? scored : diversify(scored, limit);
 }
 
 

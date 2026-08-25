@@ -2,14 +2,15 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
+import { BarChart3, Check, ChevronDown, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
 
 import { RequireAuth } from "@/components/require-auth";
 import { MoviePoster } from "@/components/movie-poster";
 import { MovieGrid, type GridItem } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { MOVIES, MOVIES_BY_ID } from "@/data/catalog";
-import { getRecommendations, getMovieDetails } from "@/lib/app.functions";
+import { getRecommendations, getMovieDetails, explainPick } from "@/lib/app.functions";
+import { ScoreBreakdownPanel } from "@/components/score-breakdown";
 import { registerMovies } from "@/lib/movie-registry";
 import { FEATURE_LABELS, semanticSimilarity } from "@/lib/recommender";
 import { useMovieAction, useSnapshot } from "@/hooks/use-app-data";
@@ -115,6 +116,15 @@ function MovieDetail() {
         .map(({ m }) => ({ movieId: m.id })),
     [movie],
   );
+
+  const explain = useServerFn(explainPick);
+  const [showWhy, setShowWhy] = useState(false);
+  const whyQuery = useQuery({
+    queryKey: ["why", movie.id],
+    queryFn: () => explain({ data: { movieId: movie.id } }),
+    enabled: showWhy,
+    staleTime: 60_000,
+  });
 
   const recommend = useServerFn(getRecommendations);
   const similarQuery = useQuery({
@@ -228,6 +238,30 @@ function MovieDetail() {
               ))}
             </ul>
           </div>
+
+          <div className="mt-8">
+            <button
+              type="button"
+              onClick={() => setShowWhy((s) => !s)}
+              aria-expanded={showWhy}
+              className="flex items-center gap-2 text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <BarChart3 className="size-3.5" />
+              Why this pick
+              {typeof whyQuery.data?.fit === "number" && <span className="text-primary">{whyQuery.data.fit}% fit</span>}
+              <ChevronDown className={cn("size-3.5 transition-transform", showWhy && "rotate-180")} />
+            </button>
+            {showWhy &&
+              (whyQuery.isPending ? (
+                <p className="mt-3 text-sm text-muted-foreground">Working out the numbers…</p>
+              ) : whyQuery.data?.breakdown ? (
+                <ScoreBreakdownPanel breakdown={whyQuery.data.breakdown} />
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">No score breakdown available for this film.</p>
+              ))}
+          </div>
+
+
 
           <div className="mt-8">
             <FeedbackDialog trigger="Tell us what's off about this pick" movieId={movie.id} />
