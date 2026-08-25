@@ -47,7 +47,7 @@ export function MovieCard({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              action.mutate({ movieId: movie.id, action: "dislike" });
+              action.mutate({ movieId: movie.id, action: "not_interested" });
               onRemove(movie.id);
             }}
             className="chamfer-sm hairline absolute left-2 top-2 flex size-8 items-center justify-center bg-background/80 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
