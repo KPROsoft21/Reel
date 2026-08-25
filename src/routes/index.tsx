@@ -6,6 +6,8 @@ import { ArrowRight, Sparkles } from "lucide-react";
 
 import { RequireAuth } from "@/components/require-auth";
 import { MovieGrid } from "@/components/movie-grid";
+import { FilterBar } from "@/components/filter-bar";
+import { EMPTY_FILTERS, type MovieFilters } from "@/lib/filters";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { getRecommendations, getSearchOptions } from "@/lib/app.functions";
 import { registerMovies } from "@/lib/movie-registry";
@@ -47,9 +49,11 @@ const PROMPTS = [
 
 function Home() {
   const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<MovieFilters>(EMPTY_FILTERS);
   const [promptIndex, setPromptIndex] = useState(0);
   const [heading, setHeading] = useState("Best matches");
   const [dismissed, setDismissed] = useState<number[]>([]);
+  const [refilter, setRefilter] = useState(0);
   const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
   const [lastQuery, setLastQuery] = useState("");
   const [lastEntity, setLastEntity] = useState<Option | null>(null);
@@ -74,6 +78,7 @@ function Home() {
           seed: input.seed,
           limit: 9,
           entity: input.entity ? { kind: input.entity.kind, id: input.entity.id, label: input.entity.label } : null,
+          filters,
         },
       }),
     onSuccess: (res, input) => {
@@ -97,6 +102,7 @@ function Home() {
           seed: Math.floor(Math.random() * 100000),
           limit: 1,
           entity: lastEntity ? { kind: lastEntity.kind, id: lastEntity.id, label: lastEntity.label } : null,
+          filters,
         },
       }),
   });
@@ -136,6 +142,13 @@ function Home() {
     run("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Changing a filter re-asks with the same query, honouring the new constraints.
+  useEffect(() => {
+    if (!refilter) return;
+    run(lastQuery, lastEntity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refilter]);
 
   const onRemove = (id: number) => {
     const nextDismissed = dismissed.includes(id) ? dismissed : [...dismissed, id];
@@ -200,6 +213,13 @@ function Home() {
             <ArrowRight className="size-5" />
           </button>
         </form>
+        <FilterBar
+          value={filters}
+          onChange={(next) => {
+            setFilters(next);
+            setRefilter((n) => n + 1);
+          }}
+        />
       </section>
 
 

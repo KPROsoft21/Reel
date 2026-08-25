@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+import {
+  EMPTY_AFFINITY,
+  decadeOf,
+  hasActiveFilters,
+  matchesFilters,
+  type FilterAffinity,
+  type MovieFilters,
+} from "@/lib/filters";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
@@ -84,6 +92,15 @@ export const getRecommendations = createServerFn({ method: "POST" })
         seed: z.number().default(0),
         limit: z.number().min(1).max(24).default(9),
         similarToMovieId: z.number().nullish(),
+        filters: z
+          .object({
+            yearMin: z.number().nullish(),
+            yearMax: z.number().nullish(),
+            ratingMin: z.number().nullish(),
+            runtimeMax: z.number().nullish(),
+            genres: z.array(z.string()).default([]),
+          })
+          .nullish(),
         entity: z
           .object({
             kind: z.enum(["actor", "director", "franchise", "studio", "keyword", "title"]),
@@ -97,11 +114,64 @@ export const getRecommendations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const [prefsRes, interactionsRes, knowledgeRes] = await Promise.all([
+    const filters: MovieFilters = {
+      yearMin: data.filters?.yearMin ?? null,
+      yearMax: data.filters?.yearMax ?? null,
+      ratingMin: data.filters?.ratingMin ?? null,
+      runtimeMax: data.filters?.runtimeMax ?? null,
+      genres: data.filters?.genres ?? [],
+    };
+
+    const [prefsRes, interactionsRes, knowledgeRes, affinityRes] = await Promise.all([
       supabase.from("user_preferences").select("*").eq("user_id", userId),
       supabase.from("user_movie_interactions").select("movie_id, watched, liked, not_interested_at, not_interested_count").eq("user_id", userId),
       supabase.from("user_knowledge").select("signals").eq("user_id", userId).eq("active", true),
+      supabase.from("user_filter_affinity").select("*").eq("user_id", userId).maybeSingle(),
     ]);
+    const affinityRow = affinityRes.data as
+      | { decade_counts: unknown; genre_counts: unknown; rating_min_avg: number | null; runtime_max_avg: number | null; uses: number }
+      | null;
+    const numberMap = (v: unknown): Record<string, number> =>
+      v && typeof v === "object" && !Array.isArray(v)
+        ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, n]) => [k, Number(n) || 0]))
+        : {};
+    const affinity: FilterAffinity = affinityRow
+      ? {
+          decades: numberMap(affinityRow.decade_counts),
+          genres: numberMap(affinityRow.genre_counts),
+          ratingMin: affinityRow.rating_min_avg === null ? null : Number(affinityRow.rating_min_avg),
+          runtimeMax: affinityRow.runtime_max_avg === null ? null : Number(affinityRow.runtime_max_avg),
+          uses: Number(affinityRow.uses ?? 0),
+        }
+      : EMPTY_AFFINITY;
+
+    // Filtering is itself a taste signal: remember the eras and genres the
+    // viewer keeps asking for so unfiltered feeds lean the same way.
+    if (hasActiveFilters(filters)) {
+      const decades = { ...affinity.decades };
+      const genres = { ...affinity.genres };
+      if (filters.yearMin || filters.yearMax) {
+        const key = decadeOf(filters.yearMin ?? filters.yearMax ?? 0);
+        decades[key] = (decades[key] ?? 0) + 1;
+      }
+      for (const g of filters.genres) genres[g] = (genres[g] ?? 0) + 1;
+      const uses = affinity.uses + 1;
+      const blend = (prev: number | null, next: number | null) =>
+        next === null ? prev : prev === null ? next : prev * 0.7 + next * 0.3;
+      const next = {
+        user_id: userId,
+        decade_counts: decades,
+        genre_counts: genres,
+        rating_min_avg: blend(affinity.ratingMin, filters.ratingMin),
+        runtime_max_avg: blend(affinity.runtimeMax, filters.runtimeMax),
+        uses,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase.from("user_filter_affinity").upsert(next, { onConflict: "user_id" });
+      affinity.decades = decades;
+      affinity.genres = genres;
+      affinity.uses = uses;
+    }
     const prefs = asPrefs(prefsRes.data ?? []);
     const interactions = asInteractions(interactionsRes.data ?? []);
     const knowledge = (knowledgeRes.data ?? []).map((row) => toSignals(row.signals));
@@ -134,6 +204,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
       const entityMovies = await tmdbEntityMovies(entity.kind, entity.id, 8);
       titleHits = entityMovies.filter((m) => !data.excludeIds.includes(m.id)).slice(0, 6);
     }
+    titleHits = titleHits.filter((m) => matchesFilters(m, filters));
     const topHit = titleHits[0];
 
     const entityReason: Record<string, string> = {
@@ -197,6 +268,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
       excludeIds: [...data.excludeIds, ...hitIds, ...(anchor ? [anchor.id] : [])],
       limit: fillLimit,
       seed: data.seed,
+      filters,
+      affinity,
     });
 
     const hitScored = titleHits.map((movie, i) => ({
