@@ -52,6 +52,7 @@ function Home() {
   const [dismissed, setDismissed] = useState<number[]>([]);
   const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
   const [lastQuery, setLastQuery] = useState("");
+  const [lastEntity, setLastEntity] = useState<Option | null>(null);
   const recommend = useServerFn(getRecommendations);
   const searchOptions = useServerFn(getSearchOptions);
   type Option = { kind: "actor" | "director" | "franchise" | "studio" | "keyword" | "title"; id: string; label: string; subtitle: string };
@@ -79,6 +80,8 @@ function Home() {
       registerMovies(res.extras);
       if (res.notice) toast.message(res.notice);
       setLastQuery(input.q);
+      setLastEntity(input.entity ?? null);
+      setLastEntity(input.entity ?? null);
       setFeed(res.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
     },
@@ -88,7 +91,13 @@ function Home() {
   const replace = useMutation({
     mutationFn: (input: { exclude: number[] }) =>
       recommend({
-        data: { query: lastQuery, excludeIds: input.exclude, seed: Math.floor(Math.random() * 100000), limit: 1 },
+        data: {
+          query: lastQuery,
+          excludeIds: input.exclude,
+          seed: Math.floor(Math.random() * 100000),
+          limit: 1,
+          entity: lastEntity ? { kind: lastEntity.kind, id: lastEntity.id, label: lastEntity.label } : null,
+        },
       }),
   });
 
