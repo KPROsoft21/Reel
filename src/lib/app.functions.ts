@@ -115,7 +115,20 @@ export const getRecommendations = createServerFn({ method: "POST" })
         .slice(0, titleHits.length ? 2 : 4);
       titleHits = [...titleHits, ...extraHits];
     }
+    let entity: Awaited<ReturnType<typeof tmdbEntitySearch>> = null;
+    if (!anchor && !titleHits.length && q.length >= 3) {
+      entity = await tmdbEntitySearch(q, 6);
+      if (entity) titleHits = entity.movies.filter((m) => !data.excludeIds.includes(m.id));
+    }
     const topHit = titleHits[0];
+
+    const entityReason: Record<string, string> = {
+      actor: "Stars",
+      director: "Directed by",
+      franchise: "Part of",
+      studio: "From",
+      keyword: "Matches",
+    };
 
     if (anchor) {
       intent = {
@@ -124,6 +137,15 @@ export const getRecommendations = createServerFn({ method: "POST" })
         similar_to: [anchor.title],
         genres_include: anchor.genres.slice(0, 2),
         summary: `something like ${anchor.title}`,
+      };
+    } else if (entity && topHit) {
+      intent = {
+        positive: {},
+        negative: {},
+        similar_to: entity.movies.slice(0, 3).map((m) => m.title),
+        genres_include: topHit.genres.slice(0, 2),
+        summary: `${entity.label} films`,
+        exact_title: entity.label,
       };
     } else if (topHit) {
       intent = {
@@ -141,6 +163,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
     }
 
     const hitIds = titleHits.map((m) => m.id);
+
     const fillLimit = Math.max(1, data.limit - hitIds.length);
     const filler = rankMovies({
       intent,
