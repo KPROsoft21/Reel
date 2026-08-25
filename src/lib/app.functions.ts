@@ -122,12 +122,22 @@ export const getRecommendations = createServerFn({ method: "POST" })
       genres: data.filters?.genres ?? [],
     };
 
-    const [prefsRes, interactionsRes, knowledgeRes, affinityRes] = await Promise.all([
+    const [prefsRes, interactionsRes, knowledgeRes, affinityRes, watchlistRes] = await Promise.all([
       supabase.from("user_preferences").select("*").eq("user_id", userId),
       supabase.from("user_movie_interactions").select("movie_id, watched, liked, not_interested_at, not_interested_count").eq("user_id", userId),
       supabase.from("user_knowledge").select("signals").eq("user_id", userId).eq("active", true),
       supabase.from("user_filter_affinity").select("*").eq("user_id", userId).maybeSingle(),
+      supabase.from("watchlists").select("movie_id, status").eq("user_id", userId).neq("status", "removed"),
     ]);
+    // Anything the viewer has already engaged with — liked, disliked, marked
+    // watched, or saved to their list — never comes back as a recommendation.
+    const engagedIds = new Set<number>([
+      ...(interactionsRes.data ?? [])
+        .filter((i) => i.liked !== null || i.watched)
+        .map((i) => Number(i.movie_id)),
+      ...(watchlistRes.data ?? []).map((w) => Number(w.movie_id)),
+    ]);
+
     const affinityRow = affinityRes.data as
       | { decade_counts: unknown; genre_counts: unknown; rating_min_avg: number | null; runtime_max_avg: number | null; uses: number }
       | null;
