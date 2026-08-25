@@ -237,6 +237,39 @@ export type Database = {
           },
         ]
       }
+      user_knowledge: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          raw_text: string
+          signals: Json
+          summary: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          raw_text: string
+          signals?: Json
+          summary: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          raw_text?: string
+          signals?: Json
+          summary?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_movie_interactions: {
         Row: {
           first_seen_at: string
