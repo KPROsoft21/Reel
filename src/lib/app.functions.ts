@@ -115,10 +115,12 @@ export const getRecommendations = createServerFn({ method: "POST" })
         .slice(0, titleHits.length ? 2 : 4);
       titleHits = [...titleHits, ...extraHits];
     }
-    let entity: EntityResult | null = null;
-    if (!anchor && !titleHits.length && q.length >= 3) {
-      entity = await tmdbEntitySearch(q, 6);
-      if (entity) titleHits = entity.movies.filter((m) => !data.excludeIds.includes(m.id));
+    // The viewer explicitly picked what they meant (actor, director, franchise,
+    // studio or theme) — no guessing.
+    const entity = data.entity ?? null;
+    if (entity) {
+      const entityMovies = await tmdbEntityMovies(entity.kind, entity.id, 8);
+      titleHits = entityMovies.filter((m) => !data.excludeIds.includes(m.id)).slice(0, 6);
     }
     const topHit = titleHits[0];
 
@@ -128,6 +130,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
       franchise: "Part of",
       studio: "From",
       keyword: "Matches",
+      title: "Matches",
     };
 
     if (anchor) {
@@ -142,11 +145,12 @@ export const getRecommendations = createServerFn({ method: "POST" })
       intent = {
         positive: {},
         negative: {},
-        similar_to: entity.movies.slice(0, 3).map((m) => m.title),
+        similar_to: titleHits.slice(0, 3).map((m) => m.title),
         genres_include: topHit.genres.slice(0, 2),
         summary: `${entity.label} films`,
         exact_title: entity.label,
       };
+    }
     } else if (topHit) {
       intent = {
         positive: {},
