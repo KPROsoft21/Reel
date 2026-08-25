@@ -192,6 +192,15 @@ function Profile() {
         )}
       </CollapsibleSection>
 
+      <div className="mb-10 mt-6">
+        <CollapsibleSection
+          title="Info"
+          description="A deep dive into every number behind your recommendations — the traits, weights, biases and evidence the engine uses."
+        >
+          <AlgorithmInfo />
+        </CollapsibleSection>
+      </div>
+
 
       <div className="mb-10">
         <KnowledgeBase />
