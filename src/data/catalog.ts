@@ -1,5 +1,7 @@
 // AUTO-GENERATED from TMDB. Do not hand-edit; regenerate with the import script.
 // Feature values are normalized 0..1 semantic attributes used by the recommender.
+import { deriveExtendedFeatures, EXTENDED_FEATURE_KEYS } from "@/lib/extended-features";
+
 export const FEATURE_KEYS = ["character_driven","atmosphere","philosophical","humor","tension","romance","visual_style","slow_burn","complexity","emotional_intensity","realism","violence","world_building","dark_tone","optimism"] as const;
 
 export type Movie = {
