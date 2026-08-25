@@ -72,12 +72,14 @@ export const getRecommendations = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const [prefsRes, interactionsRes] = await Promise.all([
+    const [prefsRes, interactionsRes, knowledgeRes] = await Promise.all([
       supabase.from("user_preferences").select("*").eq("user_id", userId),
       supabase.from("user_movie_interactions").select("movie_id, watched, liked").eq("user_id", userId),
+      supabase.from("user_knowledge").select("signals").eq("user_id", userId).eq("active", true),
     ]);
     const prefs = asPrefs(prefsRes.data ?? []);
     const interactions = asInteractions(interactionsRes.data ?? []);
+    const knowledge = (knowledgeRes.data ?? []).map((row) => toSignals(row.signals));
 
     let intent: Intent = { positive: {}, negative: {}, summary: "" };
     let notice: string | undefined;
@@ -96,7 +98,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
       notice = parsed.notice;
     }
 
-    const ranked = rankMovies({ intent, prefs, interactions, excludeIds: anchor ? [...data.excludeIds, anchor.id] : data.excludeIds, limit: data.limit, seed: data.seed });
+    const ranked = rankMovies({ intent, prefs, interactions, knowledge, excludeIds: anchor ? [...data.excludeIds, anchor.id] : data.excludeIds, limit: data.limit, seed: data.seed });
+
 
     let searchId: number | null = null;
     if (data.query.trim()) {
