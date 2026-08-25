@@ -196,6 +196,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
         reasons: r.reasons,
         components: r.components,
       })),
+      extras,
     };
   });
 
