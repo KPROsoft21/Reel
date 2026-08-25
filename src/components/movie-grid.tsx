@@ -1,8 +1,10 @@
 import { getMovie } from "@/lib/movie-registry";
+import type { ScoreBreakdown } from "@/lib/recommender";
 import { MovieCard } from "./movie-card";
 import { useSnapshot } from "@/hooks/use-app-data";
 
-export type GridItem = { movieId: number; fit?: number; reasons?: string[] };
+export type GridItem = { movieId: number; fit?: number; reasons?: string[]; breakdown?: ScoreBreakdown };
+
 
 export function MovieGrid({
   items,
