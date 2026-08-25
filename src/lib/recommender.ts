@@ -410,7 +410,10 @@ export function rankMovies({
   seed = 0,
   filters = null,
   affinity = null,
+  only,
 }: RankInput): ScoredMovie[] {
+  const forced = only && only.length ? only : null;
+
   const seen = new Map(interactions.map((i) => [i.movie_id, i]));
   const likedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === true);
   const dislikedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === false);
