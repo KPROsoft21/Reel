@@ -32,15 +32,68 @@ export function useSnapshot() {
   });
 }
 
+type SnapshotData = Awaited<ReturnType<typeof getSnapshot>>;
+
+/** Patch the cached snapshot right away so buttons respond instantly; the
+ *  server write still runs and reconciles the cache when it lands. */
+function optimistic(prev: SnapshotData, movieId: number, action: MovieAction): SnapshotData {
+  const now = new Date().toISOString();
+  const interactions = [...prev.interactions];
+  const idx = interactions.findIndex((i) => i.movie_id === movieId);
+  const base = interactions[idx] ?? {
+    movie_id: movieId,
+    watched: false,
+    liked: null,
+    not_interested_at: null,
+    not_interested_count: 0,
+  };
+  const next = { ...base };
+
+  if (action === "like") { next.liked = true; next.watched = true; }
+  if (action === "dislike") next.liked = false;
+  if (action === "clear_rating") next.liked = null;
+  if (action === "watched") next.watched = true;
+  if (action === "unwatched") next.watched = false;
+  if (action === "not_interested") {
+    next.not_interested_at = now;
+    next.not_interested_count = (base.not_interested_count ?? 0) + 1;
+  }
+  if (idx >= 0) interactions[idx] = next;
+  else interactions.push(next);
+
+  let watchlist = prev.watchlist;
+  if (action === "add_list" || action === "like" || action === "watched") {
+    const status = action === "add_list" ? "want_to_watch" : "watched";
+    watchlist = watchlist.some((w) => w.movie_id === movieId)
+      ? watchlist.map((w) => (w.movie_id === movieId ? { ...w, status } : w))
+      : [...watchlist, { movie_id: movieId, status, added_at: now }];
+  }
+  if (action === "remove_list") watchlist = watchlist.filter((w) => w.movie_id !== movieId);
+
+  return { ...prev, interactions, watchlist };
+}
+
 export function useMovieAction() {
   const qc = useQueryClient();
   const act = useServerFn(recordAction);
   return useMutation({
     mutationFn: (input: { movieId: number; action: MovieAction }) => act({ data: input }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
-    onError: () => toast.error("Couldn't save that just now."),
+    onMutate: async ({ movieId, action }) => {
+      await qc.cancelQueries({ queryKey: ["snapshot"] });
+      const snapshots = qc.getQueriesData<SnapshotData>({ queryKey: ["snapshot"] });
+      for (const [key, data] of snapshots) {
+        if (data) qc.setQueryData(key, optimistic(data, movieId, action));
+      }
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      for (const [key, data] of ctx?.snapshots ?? []) qc.setQueryData(key, data);
+      toast.error("Couldn't save that just now.");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["snapshot"] }),
   });
 }
+
 
 export function useProfileUpdate() {
   const qc = useQueryClient();

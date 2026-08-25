@@ -399,20 +399,22 @@ async function learnFrom(
   const { data } = await supabase.from("user_preferences").select("*").eq("user_id", userId);
   const deltas = applyEvidence(asPrefs(data ?? []), movie, direction, evidenceType);
   if (!deltas.length) return;
-  await supabase.from("user_preferences").upsert(
-    deltas.map((d) => ({ user_id: userId, ...d, last_updated: new Date().toISOString() })),
-    { onConflict: "user_id,feature_key" },
-  );
-  await supabase.from("user_preference_evidence").insert(
-    deltas.slice(0, 6).map((d) => ({
-      user_id: userId,
-      feature_key: d.feature_key,
-      movie_id: movieId,
-      evidence_type: evidenceType,
-      evidence_value: direction,
-      confidence: d.confidence,
-    })),
-  );
+  await Promise.all([
+    supabase.from("user_preferences").upsert(
+      deltas.map((d) => ({ user_id: userId, ...d, last_updated: new Date().toISOString() })),
+      { onConflict: "user_id,feature_key" },
+    ),
+    supabase.from("user_preference_evidence").insert(
+      deltas.slice(0, 6).map((d) => ({
+        user_id: userId,
+        feature_key: d.feature_key,
+        movie_id: movieId,
+        evidence_type: evidenceType,
+        evidence_value: direction,
+        confidence: d.confidence,
+      })),
+    ),
+  ]);
 }
 
 const ActionSchema = z.object({
@@ -428,12 +430,15 @@ export const recordAction = createServerFn({ method: "POST" })
     const { movieId, action } = data;
     const now = new Date().toISOString();
 
-    await supabase.from("movie_interaction_events").insert({ user_id: userId, movie_id: movieId, event_type: action });
+    // Everything that doesn't depend on another write runs concurrently:
+    // the round-trips dominate, so serialising them made clicks feel slow.
+    const jobs: PromiseLike<unknown>[] = [
+      supabase.from("movie_interaction_events").insert({ user_id: userId, movie_id: movieId, event_type: action }),
+    ];
 
     if (action === "like") {
-      await supabase
-        .from("user_movie_interactions")
-        .upsert({
+      jobs.push(
+        supabase.from("user_movie_interactions").upsert({
           user_id: userId,
           movie_id: movieId,
           liked: true,
@@ -441,81 +446,102 @@ export const recordAction = createServerFn({ method: "POST" })
           rated_at: now,
           watched_at: now,
           updated_at: now,
-        }, { onConflict: "user_id,movie_id" });
-      await supabase
-        .from("watchlists")
-        .upsert({ user_id: userId, movie_id: movieId, status: "watched", watched_at: now, removed_at: null }, { onConflict: "user_id,movie_id" });
-      await learnFrom(supabase, userId, movieId, 1, "liked_movie");
-      await learnFrom(supabase, userId, movieId, 1, "watched");
+        }, { onConflict: "user_id,movie_id" }),
+        supabase
+          .from("watchlists")
+          .upsert({ user_id: userId, movie_id: movieId, status: "watched", watched_at: now, removed_at: null }, { onConflict: "user_id,movie_id" }),
+        // Preference writes touch the same rows, so they stay ordered.
+        (async () => {
+          await learnFrom(supabase, userId, movieId, 1, "liked_movie");
+          await learnFrom(supabase, userId, movieId, 1, "watched");
+        })(),
+      );
     }
 
     if (action === "dislike" || action === "clear_rating") {
       const liked = action === "clear_rating" ? null : false;
-      await supabase
-        .from("user_movie_interactions")
-        .upsert({ user_id: userId, movie_id: movieId, liked, rated_at: now, updated_at: now }, { onConflict: "user_id,movie_id" });
+      jobs.push(
+        supabase
+          .from("user_movie_interactions")
+          .upsert({ user_id: userId, movie_id: movieId, liked, rated_at: now, updated_at: now }, { onConflict: "user_id,movie_id" }),
+      );
       if (action === "dislike") {
-        await learnFrom(supabase, userId, movieId, -1, "disliked_movie");
+        jobs.push(learnFrom(supabase, userId, movieId, -1, "disliked_movie"));
       }
     }
 
     if (action === "watched" || action === "unwatched") {
       const watched = action === "watched";
-      await supabase
-        .from("user_movie_interactions")
-        .upsert(
-          { user_id: userId, movie_id: movieId, watched, watched_at: watched ? now : null, updated_at: now },
-          { onConflict: "user_id,movie_id" },
-        );
+      jobs.push(
+        supabase
+          .from("user_movie_interactions")
+          .upsert(
+            { user_id: userId, movie_id: movieId, watched, watched_at: watched ? now : null, updated_at: now },
+            { onConflict: "user_id,movie_id" },
+          ),
+      );
       if (watched) {
-        await supabase
-          .from("watchlists")
-          .update({ status: "watched", watched_at: now })
-          .eq("user_id", userId)
-          .eq("movie_id", movieId);
-        await learnFrom(supabase, userId, movieId, 1, "watched");
+        jobs.push(
+          supabase
+            .from("watchlists")
+            .update({ status: "watched", watched_at: now })
+            .eq("user_id", userId)
+            .eq("movie_id", movieId),
+          learnFrom(supabase, userId, movieId, 1, "watched"),
+        );
       }
     }
 
     if (action === "add_list") {
-      await supabase
-        .from("watchlists")
-        .upsert({ user_id: userId, movie_id: movieId, status: "want_to_watch", removed_at: null }, { onConflict: "user_id,movie_id" });
-      await learnFrom(supabase, userId, movieId, 1, "added_to_list");
+      jobs.push(
+        supabase
+          .from("watchlists")
+          .upsert({ user_id: userId, movie_id: movieId, status: "want_to_watch", removed_at: null }, { onConflict: "user_id,movie_id" }),
+        learnFrom(supabase, userId, movieId, 1, "added_to_list"),
+      );
     }
 
     if (action === "remove_list") {
-      await supabase
-        .from("watchlists")
-        .update({ status: "removed", removed_at: now })
-        .eq("user_id", userId)
-        .eq("movie_id", movieId);
+      jobs.push(
+        supabase
+          .from("watchlists")
+          .update({ status: "removed", removed_at: now })
+          .eq("user_id", userId)
+          .eq("movie_id", movieId),
+      );
     }
 
     if (action === "not_interested") {
-      const { data: existing } = await supabase
-        .from("user_movie_interactions")
-        .select("not_interested_count")
-        .eq("user_id", userId)
-        .eq("movie_id", movieId)
-        .maybeSingle();
-      await supabase.from("user_movie_interactions").upsert(
-        {
-          user_id: userId,
-          movie_id: movieId,
-          not_interested_at: now,
-          not_interested_count: (existing?.not_interested_count ?? 0) + 1,
-          updated_at: now,
-        },
-        { onConflict: "user_id,movie_id" },
+      jobs.push(
+        (async () => {
+          const { data: existing } = await supabase
+            .from("user_movie_interactions")
+            .select("not_interested_count")
+            .eq("user_id", userId)
+            .eq("movie_id", movieId)
+            .maybeSingle();
+          await supabase.from("user_movie_interactions").upsert(
+            {
+              user_id: userId,
+              movie_id: movieId,
+              not_interested_at: now,
+              not_interested_count: (existing?.not_interested_count ?? 0) + 1,
+              updated_at: now,
+            },
+            { onConflict: "user_id,movie_id" },
+          );
+        })(),
+        // Weak negative: no interest shown, not a dislike.
+        learnFrom(supabase, userId, movieId, -1, "not_interested"),
       );
-      // Weak negative: no interest shown, not a dislike.
-      await learnFrom(supabase, userId, movieId, -1, "not_interested");
     }
 
     if (action === "opened") {
-      await learnFrom(supabase, userId, movieId, 1, "opened");
+      jobs.push(learnFrom(supabase, userId, movieId, 1, "opened"));
     }
+
+    await Promise.all(jobs);
+
 
     return { ok: true };
   });
