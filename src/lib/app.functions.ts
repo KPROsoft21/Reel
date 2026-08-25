@@ -288,18 +288,48 @@ export const getRecommendations = createServerFn({ method: "POST" })
       affinity,
     });
 
-    const hitScored = titleHits.map((movie, i) => ({
-      movie,
-      score: 2 - i * 0.01,
-      components: { preference: 0, semantic: 1, theme: 0, novelty: 0, discovery: 0, context: 1, popularity: movie.popularity },
-      reasons: [entity ? `${entityReason[entity.kind]} ${entity.label}` : "Matches the title you searched"],
-      // Direct matches rank first, but the % still reflects how strong the
-      // match is (rank in the result set + the film's own standing).
-      fit: Math.max(
-        62,
-        Math.min(99, Math.round(97 - i * 3 + (movie.rating - 7) * 2)),
-      ),
-    }));
+    const hitScored = titleHits.map((movie, i) => {
+      const fit = Math.max(62, Math.min(99, Math.round(97 - i * 3 + (movie.rating - 7) * 2)));
+      const label = entity ? `${entityReason[entity.kind]} ${entity.label}` : "Matches the title you searched";
+      return {
+        movie,
+        score: 2 - i * 0.01,
+        components: { preference: 0, semantic: 1, theme: 0, novelty: 0, discovery: 0, context: 1, popularity: movie.popularity },
+        reasons: [label],
+        // Direct matches rank first, but the % still reflects how strong the
+        // match is (rank in the result set + the film's own standing).
+        fit,
+        breakdown: {
+          lines: [
+            { key: "context", label: "Direct search match", value: 1, weight: 1, contribution: 1, hint: label },
+            {
+              key: "rank",
+              label: "Position in the match list",
+              value: Math.max(0, 1 - i * 0.05),
+              weight: 0.1,
+              contribution: Math.max(0, 0.1 - i * 0.005),
+              hint: `Result #${i + 1} for this search.`,
+            },
+            {
+              key: "rating",
+              label: "Critical standing",
+              value: Math.max(0, Math.min(1, (movie.rating - 6) / 3)),
+              weight: 0.1,
+              contribution: ((movie.rating - 7) * 2) / 100,
+              hint: `Audience rating ${movie.rating.toFixed(1)}/10.`,
+            },
+          ],
+          adjustments: [],
+          weighted: 1,
+          budget: 1.2,
+          total: 2 - i * 0.01,
+          quality: fit / 100,
+          fit,
+          mode: "direct" as const,
+        },
+      };
+    });
+
 
 
     const ranked = [...hitScored, ...filler].slice(0, data.limit);
