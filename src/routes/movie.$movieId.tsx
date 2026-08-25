@@ -20,11 +20,46 @@ export const Route = createFileRoute("/movie/$movieId")({
     const id = Number(params.movieId);
     const local = MOVIES_BY_ID.get(id);
     if (local) return { movie: local };
-    const res = await getMovieDetails({ data: { movieId: id } });
-    if (!res.movie) throw notFound();
-    registerMovies([res.movie]);
-    return { movie: res.movie };
+
+    // Network hiccups (dev HMR, cold worker) can make the server-fn fetch fail.
+    // Retry briefly instead of letting the loader reject into a blank screen.
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await getMovieDetails({ data: { movieId: id } });
+        if (!res.movie) throw notFound();
+        registerMovies([res.movie]);
+        return { movie: res.movie };
+      } catch (err) {
+        if (err && typeof err === "object" && "isNotFound" in (err as Record<string, unknown>)) throw err;
+        lastError = err;
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+    console.error("Failed to load movie", id, lastError);
+    throw notFound();
   },
+  notFoundComponent: () => (
+    <div className="mx-auto max-w-lg px-6 py-24 text-center">
+      <h1 className="text-2xl font-semibold">We couldn't load this film</h1>
+      <p className="mt-3 text-sm text-muted-foreground">
+        The details didn't come through. Check your connection and try again.
+      </p>
+      <Link to="/" className="mt-6 inline-block text-sm underline">
+        Back to recommendations
+      </Link>
+    </div>
+  ),
+  errorComponent: () => (
+    <div className="mx-auto max-w-lg px-6 py-24 text-center">
+      <h1 className="text-2xl font-semibold">Something went wrong</h1>
+      <p className="mt-3 text-sm text-muted-foreground">Please try reloading this page.</p>
+      <Link to="/" className="mt-6 inline-block text-sm underline">
+        Back to recommendations
+      </Link>
+    </div>
+  ),
+
   head: ({ loaderData }) => {
     if (!loaderData) {
       return { meta: [{ title: "Film unavailable — Reel" }, { name: "robots", content: "noindex" }] };
