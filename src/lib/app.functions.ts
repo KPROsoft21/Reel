@@ -214,7 +214,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
       // An entity search should stay on-subject: pull a deep pool of that
       // person's / franchise's / studio's films and fill the whole page with
       // them (and later pages via excludeIds) before any generic filler.
-      const entityMovies = await tmdbEntityMovies(entity.kind, entity.id, 80);
+      const depth = Math.min(45, data.limit + data.excludeIds.length + engagedIds.size + 6);
+      const entityMovies = await tmdbEntityMovies(entity.kind, entity.id, depth);
       titleHits = entityMovies
         .filter((m) => !data.excludeIds.includes(m.id) && !engagedIds.has(m.id))
         .slice(0, data.limit);
