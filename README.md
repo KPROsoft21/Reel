@@ -1,334 +1,359 @@
 <div align="center">
-  <img src="src/assets/reel-logo.png" alt="Reel logo" width="160" />
+  <img src="src/assets/reel-logo.png" alt="Reel logo" width="150" />
+  <h1>Reel</h1>
+  <p><strong>An explainable, taste-learning movie recommender built with TanStack Start, Supabase, TMDB, and AI-assisted intent parsing.</strong></p>
+  <p>
+    <a href="#product-overview">Overview</a> |
+    <a href="#features">Features</a> |
+    <a href="#recommendation-engine">Algorithm</a> |
+    <a href="#development">Development</a> |
+    <a href="#deployment">Deployment</a>
+  </p>
 </div>
 
-<div align="center">
- <h1> Reel </h1>
-</div>
-> A personalized film recommender. Ask for what you're in the mood for, swipe through picks, or dive into a single film — every like, save, watch and skip feeds a taste model that gets sharper the more you use it.
+---
 
-## What it does
+## Product Overview
 
-Reel is a full-stack recommendation app for movies. It combines a curated catalog of ~1,000 popular films with live data from TMDB, so virtually any film is reachable. The recommender blends your explicit feedback with AI-parsed mood queries, natural-language taste rules, and filtering habits to produce a ranked feed with explainable fit scores.
+Reel is a full-stack film discovery app that learns what a viewer actually likes. Users can describe a mood, search for a title or film-world entity, swipe through one movie at a time, save titles to a watchlist, mark films as watched, and build a personal taste profile through explicit feedback.
 
-Key user flows:
+The app combines a curated, recommender-ready catalog with live TMDB hydration so the experience is not limited to bundled data. Its ranking system is deterministic and explainable: AI helps translate language into structured signals, while `src/lib/recommender.ts` owns the scoring, learning, exclusions, diversification, and fit-percentage math.
 
-- **Home** — describe a mood in plain language, apply filters, and get nine ranked picks. Each card shows a fit % and a short reason. Remove a card and it is instantly replaced.
-- **Search / disambiguation** — searching a person, franchise, studio, or ambiguous term (e.g. “marvel”) surfaces “Did you mean…” chips instead of guessing.
-- **Movie detail** — view synopsis, metadata, action buttons, a “Why this pick” score breakdown, and a “More like this” feed anchored to that film.
-- **Swipe** — a one-at-a-time Tinder-style picker. Swipe left to pass, right to save, up (or the heart button) to like. Buttons sit under the title inside the card.
-- **My List / Favorites / Watched** — saved lists built from your interactions.
-- **Profile** — edit your display name and bio, read an AI-generated taste summary, inspect live learned traits, explore the algorithm’s numeric read of you, and manage a personal knowledge base.
+## Features
 
-## Algorithm overview
+| Area | What it does |
+| --- | --- |
+| Home feed | Accepts natural-language prompts, filters, and search context, then returns ranked movie cards with fit scores and explanations. |
+| Search | Handles direct title matches, remote TMDB title lookup, and entity-based discovery for actors, directors, franchises, studios, keywords, and ambiguous queries. |
+| Movie detail | Shows synopsis, metadata, poster art, user actions, score breakdowns, and similar recommendations anchored to the selected film. |
+| Swipe mode | Provides a focused, one-card-at-a-time recommendation flow with like, save, pass, and watched actions. |
+| My List | Stores films the viewer wants to watch and separates them from future recommendations. |
+| Favorites | Tracks liked films and uses them as strong evidence for the taste model. |
+| Watched | Keeps viewing history visible while preventing repeat recommendations. |
+| Profile | Displays account details, AI-generated taste summaries, learned taste tags, numeric algorithm insights, and a personal knowledge base. |
+| Knowledge base | Lets users write durable preference notes, which are parsed into structured genre, person, keyword, and feature rules. |
+| Explainability | Surfaces the weighted signals behind a recommendation instead of hiding the score behind a black box. |
 
-Reel’s recommender is a hybrid, explainable scoring engine. It does not rank movies by popularity or by a single tag. Instead, every candidate gets a fit score built from dozens of signals: your explicit feedback, the words you typed, the filters you use, the movies you have already engaged with, and the semantic shape of each film.
+## Recommendation Engine
 
-### 1. Feature space — how a movie is represented
+Reel uses a hybrid content-based ranking engine. It blends user history, explicit feedback, temporary search intent, written taste rules, filters, popularity, rating, novelty, and exploration into one calibrated ranking.
 
-Every movie is converted into a numeric feature vector so the algorithm can compare films and compare them to your taste.
+The algorithm is intentionally not "just genre matching." Each movie is represented as a normalized feature vector, and each viewer accumulates a learned preference model over time.
 
-#### Core features (15 dimensions)
+### Movie Representation
 
-Each film receives a score from 0 to 1 on:
+Every movie starts with 15 core semantic dimensions:
 
-1. Character-driven
-2. Atmosphere / mood
-3. Philosophical / thematic depth
-4. Humor
-5. Tension / suspense
-6. Romance
-7. Visual style
-8. Slow burn
-9. Complexity
-10. Emotional intensity
-11. Realism
-12. Violence / action intensity
-13. World-building
-14. Dark tone
-15. Optimism
+| Core feature | Meaning |
+| --- | --- |
+| `character_driven` | Character focus and interpersonal storytelling |
+| `atmosphere` | Mood, texture, and immersive tone |
+| `philosophical` | Thematic or conceptual depth |
+| `humor` | Comic energy |
+| `tension` | Suspense, danger, and pressure |
+| `romance` | Romantic focus |
+| `visual_style` | Visual ambition and cinematic style |
+| `slow_burn` | Deliberate pacing |
+| `complexity` | Narrative or conceptual intricacy |
+| `emotional_intensity` | Strength of emotional experience |
+| `realism` | Groundedness |
+| `violence` | Action or violent intensity |
+| `world_building` | Scope, lore, and setting depth |
+| `dark_tone` | Bleakness, menace, or cynicism |
+| `optimism` | Warmth, hope, and uplift |
 
-These are derived from a combination of the curated catalog, TMDB genres and keywords, and the film’s overview text. They form the primary language the taste model speaks.
+The app then derives an extended semantic layer in `src/lib/extended-features.ts`. That layer adds more than 100 deterministic metrics across pacing, structure, subject matter, mood, craft, character perspective, emotional payoff, era, audience, scale, and reception. Examples include `structure_heist`, `subject_space`, `tone_unsettling`, `craft_cinematography`, `emo_comfort`, `era_modern`, and `origin_international`.
 
-#### Extended metric layer (100+ dimensions)
+Together, the core and extended vectors let Reel compare movies by feel, structure, subject, and taste fit, not only by genre labels.
 
-On top of the core 15, the engine derives more than 100 additional metrics from runtime, release year, genres, cast/crew, overview sentiment, and inferred pacing. Examples include:
+### Taste Learning
 
-- Pacing: fast-paced, deliberate, episodic, tightly plotted
-- Structure: twist-heavy, franchise film, ensemble cast, single-location
-- Subject matter: based on true events, crime, family, sci-fi concepts
-- Tone: gritty, whimsical, melancholic, uplifting
-- Craft: blockbuster scale, indie sensibility, high rewatchability
-- Era & audience: classic Hollywood, 2000s studio film, modern streaming
+User taste is stored as feature-level preferences in Supabase. Each learned preference tracks:
 
-The extended layer is used for similarity calculations and for fine-grained learning, but it does not overwhelm the core taste model. Core features drive the headline preference; extended features refine the match.
+| Field | Purpose |
+| --- | --- |
+| `feature_key` | The semantic feature being learned |
+| `preference_value` | Direction and strength, from dislike to like |
+| `confidence` | How much evidence supports the preference |
+| `importance` | How strongly the feature should affect ranking |
+| `evidence_count` | Number of signals that have shaped the value |
 
-### 2. Taste model — how the algorithm learns you
+The recommender updates only the most expressive features from each movie, capped at 30 features per evidence event. This keeps learning focused and avoids diluting the profile with neutral traits.
 
-Your taste is stored in `user_preferences` as a set of learned feature records. Each record contains:
+Evidence weights are defined in `EVIDENCE_WEIGHT`:
 
-- `feature` — the dimension name (e.g. “humor”, “dark tone”)
-- `preference` — a value from -1 (strongly dislike) to +1 (strongly like)
-- `confidence` — how sure the model is about that preference (0 to 1)
-- `importance` — how much that feature should influence ranking (0 to 1)
-- `evidence_count` — how many interactions support the learned value
-- `positive_evidence` / `negative_evidence` — counts of likes vs passes/dislikes
+| Evidence type | Weight |
+| --- | ---: |
+| Explicit correction | `1.00` |
+| Explicit feedback | `0.90` |
+| Liked movie | `0.75` |
+| Disliked movie | `0.75` |
+| Watched | `0.40` |
+| Added to list | `0.35` |
+| Opened | `0.12` |
+| Not interested | `0.08` |
+| Shown | `0.03` |
 
-#### Where evidence comes from
+The model uses a diminishing learning rate so early interactions teach quickly while mature profiles become more stable.
 
-Every interaction updates the model:
-
-| Action | Signal sent |
-|--------|-------------|
-| Like | Strong positive for the film’s features; also marks the film as watched |
-| Save / add to list | Moderate positive; the film is treated as a future watch |
-| Watched | Mild positive for features; used to avoid re-recommending |
-| Dislike | Strong negative for the film’s features |
-| Pass / X / Not interested | Mild-to-moderate negative; the film is buried for ~4 months with a decaying penalty |
-| Knowledge-base note | Parsed by AI into structured signals and merged into the taste model |
-
-#### Learning math
-
-When an interaction arrives, the engine:
-
-1. Looks up the movie’s feature vector.
-2. Computes a signed weight for the action (like = +1.0, dislike = -1.0, save = +0.5, watched = +0.3, pass = -0.4, etc.).
-3. Updates each feature with a weighted moving average:
-   - `new_preference = (old_preference * old_evidence + feature_value * action_weight) / total_evidence`
-   - `confidence` grows as evidence accumulates but is capped.
-   - `importance` rises when a feature repeatedly distinguishes likes from passes.
-4. Stores the updated row so future recommendations use it immediately.
-
-This means the algorithm does not just count genres. If you like three dark, slow-burn thrillers and pass on a dark comedy, it learns that “dark tone” is good but “humor” may not be the reason.
-
-### 3. Scoring a recommendation
-
-For every candidate movie, the engine computes a final fit score from several blended components.
-
-#### Base preference match
-
-The candidate’s core feature vector is compared against your taste model:
-
-```
-preference_score = Σ (user_preference[i] * candidate_value[i] * importance[i] * confidence[i])
+```ts
+learningRate = 0.35 / sqrt(evidence_count)
+preference_value += learningRate * evidence_weight * feature_signal
+confidence += abs(evidence_weight) * 0.12 * abs(feature_signal)
+importance = 0.4 + evidence_count * 0.04 + abs(preference_value) * 0.3
 ```
 
-Features where you have strong, confident preferences contribute more. If your model is still empty, this term is neutral and the engine relies more on discovery and query signals.
+### Ranking Signals
 
-#### Semantic similarity
+For each candidate, `rankMovies` computes a set of weighted score lines:
 
-If the request has an anchor — a search result, a selected film, a person, a franchise, or a studio — the candidate is compared to that anchor using cosine similarity over the extended feature vector. This powers “More like this” and entity searches.
+| Signal | Role |
+| --- | --- |
+| Taste model match | Measures alignment between the viewer's learned preferences and the movie's semantic vector. |
+| Similarity to liked films | Uses cosine similarity against the viewer's liked movies. |
+| Theme overlap | Rewards features the viewer repeatedly responds to positively. |
+| Request match | Scores fit against the current prompt, title anchor, similar-film request, or selected entity. |
+| Written rules | Applies durable knowledge-base preferences, including strict avoids. |
+| Critical standing | Adds a small normalized rating signal. |
+| Novelty | Rewards less obvious candidates so the feed does not become purely popularity-driven. |
+| Learning value | Favors movies that can clarify uncertain parts of the taste profile. |
+| Broad appeal | Adds a small popularity signal. |
+| Exploration shuffle | Adds deterministic variety based on seed and movie id. |
 
+Searches and normal feeds use different weights. When the viewer asks for something specific, request match dominates. When there is no active query, long-term taste, knowledge rules, semantic similarity, discovery, and controlled exploration matter more.
+
+### Filters And Affinity
+
+User-selected filters are hard constraints:
+
+- Release year range
+- Minimum rating
+- Maximum runtime
+- Genre inclusion
+
+Reel also learns filter affinity. If a viewer repeatedly filters for a decade, genre, rating floor, or runtime ceiling, future unfiltered feeds receive a small soft nudge in that direction. This is intentionally a bonus, not a hidden exclusion.
+
+### Exclusions
+
+The feed removes films the viewer has already clearly handled:
+
+- Liked
+- Disliked
+- Watched
+- Saved to the watchlist
+- Explicitly excluded by the current request
+- The anchor movie currently being viewed
+
+The `not_interested` action is different. It applies a large decaying penalty instead of a permanent ban. The default penalty fades over roughly 120 days and grows when the same title is dismissed repeatedly.
+
+### Diversification
+
+After scoring, Reel applies a lightweight diversification pass. The first pass limits repeated primary genres and directors so the page does not become nine variations of the same recommendation. If the strict pass cannot fill the requested limit, a second pass backfills from the remaining ranked candidates.
+
+### Fit Percentage
+
+The displayed fit percentage is calibrated from the blended score rather than copied from any one component.
+
+```ts
+quality = clamp01((score - jitterContribution) / (weightBudget * 0.82))
+fit = round(28 + 66 * pow(quality, 0.85))
 ```
-similarity_score = cosine(candidate_vector, anchor_vector)
-```
 
-#### Intent alignment
+Direct title matches can reach `99%`, but ordinary recommendations are designed to live in a meaningful range instead of clustering at 100%.
 
-When you type a mood query (“something tense and atmospheric”), the AI parses it into a structured intent with boosted features and optional filters. The candidate gets extra points for matching those requested features.
+## Algorithm Review
 
-```
-intent_score = Σ (intent_boost[i] * candidate_value[i])
-```
+The current algorithm is a strong pragmatic fit for this product. It is explainable, fast, and tunable without retraining a model. The separation between AI parsing and deterministic ranking is especially valuable: the app can use natural language while still showing users why a movie ranked where it did.
 
-#### Filter affinity
+**Strengths**
 
-Filters (release decade, genre, minimum rating, runtime, certification) are applied in two ways:
+- The feature-vector design captures tone, pacing, structure, and emotional shape better than genre-only recommendation.
+- Evidence weights make user actions semantically different: a like, save, opened detail page, and not-interested tap do not all mean the same thing.
+- Knowledge-base rules give users direct control over persistent taste constraints.
+- Decaying not-interested penalties avoid both bad repetition and overly permanent suppression.
+- Filter affinity learns from browsing behavior without quietly turning preferences into hard rules.
+- Score breakdowns make the recommender auditable in the UI.
 
-- **Hard filters**: if a candidate fails a filter you explicitly set, it is excluded.
-- **Soft affinity**: the algorithm tracks which decades, genres, and runtime ranges you tend to engage with and quietly nudges matching candidates upward.
+**Tradeoffs**
 
-Filter affinity is learned from your behavior, not just your explicit choices.
+- Hand-authored and deterministic feature derivation is transparent, but it depends on metadata quality and lexicon coverage.
+- The house era bias toward modern, mainstream films is product-driven. It improves casual discovery but can under-rank older or international cinema until the viewer shows clear interest.
+- The recommender is primarily content-based. It does not yet use collaborative filtering across similar users.
+- AI-parsed prompts and knowledge notes improve expressiveness, but their outputs should remain bounded by schemas and visible user controls.
 
-#### Era bias
+**Future improvements**
 
-The app is intentionally biased toward films from the 2000s through the 2020s and toward Hollywood studio productions, unless your history clearly shows a love for older or non-Hollywood cinema. The engine detects an `oldSchoolTaste` signal from your likes and saves; if it is absent, recent releases receive a small but persistent boost.
+- Add offline evaluation fixtures with known user profiles and expected ranking behavior.
+- Track precision metrics such as save rate, like rate, and not-interested rate by recommendation source.
+- Add per-user calibration for era and popularity bias instead of using one global house lean.
+- Add collaborative signals once there is enough interaction volume to avoid noisy crowd behavior.
+- Add admin tooling for inspecting feature vectors and correcting catalog-level metadata.
 
-#### Discovery / novelty nudge
+## Architecture
 
-To prevent the feed from collapsing into one narrow type, a small random jitter and a novelty bonus are added. This ensures variety without overriding your clear preferences.
-
-#### Not-interested penalty
-
-Pressing X on a card records a “not interested” interaction. The film receives a large, decaying penalty that drops over roughly 120 days. It is not treated as a dislike — the algorithm understands it as “the user did not show interest right now” — so the penalty fades and the film can reappear later if other signals strongly support it.
-
-#### Final score
-
-```
-raw_score = w_pref * preference_score
-        + w_sim * similarity_score
-        + w_intent * intent_score
-        + w_filter * filter_affinity
-        + w_era * era_bias
-        + w_discovery * discovery_nudge
-        - w_not_interested * decaying_penalty
-
-fit_percent = clamp( normalize(raw_score), 30%, 95% )
-```
-
-The normalization is calibrated so that 100% is rare. Most recommendations fall between 60% and 92%, giving the score meaning and room to improve as the model learns.
-
-### 4. Exclusions — what never gets recommended
-
-A candidate is removed from the feed if any of the following are true:
-
-- You liked it
-- You disliked it
-- You saved it
-- You marked it as watched
-- You passed on it and the decaying penalty is still strong
-- It is the currently viewed movie (on the detail page)
-
-This keeps the feed fresh and respects your explicit decisions.
-
-### 5. Search and disambiguation
-
-The search bar is not a simple title lookup.
-
-1. **Title match**: if your query closely matches a film title, that film is boosted to the top with a 100% fit score and treated as an anchor.
-2. **Entity resolution**: the query is also sent to TMDB to find people (actors, directors), franchises, studios, and collections.
-3. **Disambiguation**: if the query is ambiguous (e.g. “marvel”), the UI shows ranked “Did you mean…” chips — person, studio, franchise — instead of guessing.
-4. **Result blending**: once an entity is selected, the engine fetches up to 80 related films, scores them with the full recommender, and blends them with title matches and personalized picks.
-
-### 6. Explainability — why this pick?
-
-Every recommendation can produce a `ScoreBreakdown` that lists:
-
-- Which features helped the score (e.g. “matches your preference for dark tone”)
-- Which features hurt it (e.g. “lower than your usual optimism score”)
-- The intent match contribution
-- The similarity contribution if anchored to another film
-- The filter and era adjustments
-- The not-interested penalty if present
-
-This breakdown is shown on movie cards, in the detail page, and in the profile’s “Info” section.
-
-### 7. AI’s role in the algorithm
-
-AI is used for understanding language, not for replacing the scoring math. There are three AI-powered parsers:
-
-1. **Intent parser** (`src/lib/intent.server.ts`) — turns mood queries into structured feature boosts and filter hints.
-2. **Knowledge-base parser** (`src/lib/knowledge.server.ts`) — turns free-form notes like “I love Christopher Nolan but I’m tired of superhero movies” into structured taste signals.
-3. **Taste narrative generator** (`src/lib/taste-summary.server.ts`) — reads your learned preferences and produces a human-readable summary of what the algorithm thinks about your taste and why.
-
-The actual ranking, learning, and scoring are deterministic and run in `src/lib/recommender.ts`.
-
-## Tech stack
-
-- **Framework:** [TanStack Start](https://tanstack.com/start) (React 19 + Vite 7, file-based routing, SSR/SSG, server functions)
-- **Styling:** Tailwind CSS v4 with shadcn/ui components and custom “Reel” dark theme tokens
-- **State / data:** TanStack Query, React hooks
-- **Backend / auth:** Lovable Cloud (Supabase) — profiles, interactions, watchlists, preferences, searches, recommendations, knowledge, filter affinity
-- **External data:** TMDB API for posters, metadata, cast/crew, and live film hydration
-- **AI:** Lovable AI Gateway via the AI SDK (`@ai-sdk/openai-compatible`)
-- **Icons:** Lucide React
-- **Notifications:** Sonner
-
-## Project structure
-
-```
+```txt
 src/
-  components/           # UI components (movie cards, grids, filters, score breakdown, etc.)
-  components/ui/        # shadcn/ui primitives
-  data/catalog.ts       # ~1,000 curated films with 15 core feature vectors
-  hooks/                # Data hooks wrapping server functions and snapshot state
-  integrations/         # Lovable Cloud / Supabase clients and auth middleware
-  lib/                  # Core logic
-    recommender.ts      # Ranking, scoring, evidence, taste model math
-    extended-features.ts# 100+ derived semantic metrics
-    app.functions.ts    # Main server functions (snapshot, recommendations, actions)
-    filters.ts          # Filter schema, matching, and affinity learning
-    tmdb.server.ts      # Live TMDB fetching and on-the-fly feature derivation
-    intent.server.ts    # AI mood-query parser
-    knowledge.server.ts # AI knowledge-base summarizer
-    taste-summary.server.ts # AI taste narrative generator
-    insight.server.ts   # Numeric algorithm insight builder
-    movie-registry.ts   # In-memory registry for live-loaded TMDB films
-  routes/               # TanStack file routes
-    __root.tsx          # Root layout with app shell
-    index.tsx           # Home feed
-    auth.tsx            # Sign in / sign up
-    movie.$movieId.tsx  # Film detail page
-    swipe.tsx           # One-at-a-time swipe picker
-    my-list.tsx         # Saved watchlist
-    favorites.tsx       # Liked films
-    watched.tsx         # Watched films
-    profile.tsx         # Taste profile and settings
+  assets/
+    reel-logo.png              # Project logo used by the app and README
+  components/
+    algorithm-info.tsx         # User-facing explanation of model behavior
+    movie-card.tsx             # Recommendation card UI
+    movie-grid.tsx             # Feed/grid rendering
+    score-breakdown.tsx        # Explains weighted ranking signals
+    filter-bar.tsx             # User-facing filter controls
+    ui/                        # shadcn/ui primitives
+  data/
+    catalog.ts                 # Curated TMDB-derived movie catalog and core feature vectors
+  hooks/
+    use-app-data.ts            # Snapshot, recommendation, and action data hooks
+    use-insight.ts             # Algorithm insight hook
+    use-knowledge.ts           # Knowledge-base hook
+    use-session.ts             # Auth/session hook
+    use-taste-summary.ts       # Taste summary hook
+  integrations/
+    lovable/                   # Lovable integration
+    supabase/                  # Supabase clients, auth middleware, generated types
+  lib/
+    app.functions.ts           # Main server functions for recommendations and actions
+    recommender.ts             # Ranking, learning, scoring, explanations, diversification
+    extended-features.ts       # 100+ deterministic semantic metrics
+    filters.ts                 # Filter schema and affinity learning
+    tmdb.server.ts             # Live TMDB search and movie hydration
+    intent.server.ts           # AI intent and feedback parsing
+    knowledge.server.ts        # AI knowledge note parsing
+    taste-summary.server.ts    # AI-generated taste profile narrative
+    insight.server.ts          # Numeric algorithm insight builder
+    movie-registry.ts          # Runtime registry for live TMDB movies
+  routes/
+    __root.tsx                 # Root layout and app shell
+    index.tsx                  # Home feed
+    auth.tsx                   # Authentication
+    movie.$movieId.tsx         # Movie detail
+    swipe.tsx                  # Swipe experience
+    my-list.tsx                # Watchlist
+    favorites.tsx              # Liked films
+    watched.tsx                # Watched films
+    profile.tsx                # Profile, taste model, knowledge base
 ```
 
 ## Routes
 
-| Route | Description |
-|-------|-------------|
-| `/` | Home recommendations with search, filters, and disambiguation |
-| `/auth` | Email/password and Google sign-in |
-| `/movie/$movieId` | Film detail, actions, score breakdown, similar films |
-| `/swipe` | One-card-at-a-time swipe interface |
-| `/my-list` | Films saved to your watchlist |
-| `/favorites` | Films you liked |
-| `/watched` | Films marked as watched |
-| `/profile` | Taste summary, learned traits, algorithm info, knowledge base |
+| Route | Purpose |
+| --- | --- |
+| `/` | Home recommendations, natural-language search, filters, and disambiguation |
+| `/auth` | Email/password and Google authentication |
+| `/movie/$movieId` | Detail page, actions, score breakdown, and similar movies |
+| `/swipe` | Swipe-based discovery |
+| `/my-list` | Saved watchlist |
+| `/favorites` | Liked films |
+| `/watched` | Viewing history |
+| `/profile` | Profile settings, taste summary, learned traits, algorithm insight, and knowledge base |
 
-## Key files
+## Data Model
 
-- `src/lib/recommender.ts` — the scoring and learning engine
-- `src/lib/app.functions.ts` — server functions for recommendations and user actions
-- `src/lib/filters.ts` — filter constraints and affinity learning
-- `src/lib/tmdb.server.ts` — live TMDB integration
-- `src/lib/intent.server.ts`, `knowledge.server.ts`, `taste-summary.server.ts` — AI-backed parsers
-- `src/routes/index.tsx` — home UI and disambiguation flow
-- `src/routes/profile.tsx` — taste profile UI
-- `src/routes/swipe.tsx` — swipe UI
-- `src/hooks/use-app-data.ts` — optimistic action mutations and snapshot hook
+The application relies on Supabase tables for user state and recommendation telemetry:
 
-## Environment variables
+| Table | Stores |
+| --- | --- |
+| `profiles` | Display name, bio, avatar, and account-level profile data |
+| `user_movie_interactions` | Watched state, likes/dislikes, ratings, not-interested timestamps |
+| `watchlists` | Saved, watched, removed, and want-to-watch list state |
+| `user_preferences` | Learned feature preferences used by the ranking engine |
+| `user_preference_evidence` | Evidence trail behind preference updates |
+| `user_knowledge` | User-authored preference notes and parsed structured signals |
+| `user_filter_affinity` | Learned soft preferences from repeated filter usage |
+| `searches` | Query history and parsed temporary intent |
+| `recommendations` | Recommendation impressions, scores, ranks, and explanations |
+| `movie_interaction_events` | Event stream for shown/opened/action telemetry |
+| `user_feedback` | Structured and free-form recommendation feedback |
 
-The app expects these variables. On Lovable Cloud, Supabase values are generated automatically; TMDB and Lovable AI keys are managed as secrets.
+## Tech Stack
 
-| Variable | Purpose |
-|----------|---------|
-| `VITE_SUPABASE_URL` | Supabase project URL (client) |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key (client) |
-| `VITE_SUPABASE_PROJECT_ID` | Supabase project ID (client) |
-| `TMDB_API_KEY` | TMDB API key or read-access token (server only) |
-| `LOVABLE_API_KEY` | Lovable AI Gateway key (server only) |
+| Layer | Technology |
+| --- | --- |
+| App framework | TanStack Start, React 19, TanStack Router, Vite |
+| UI | Tailwind CSS v4, shadcn/ui, Radix UI, Lucide React, Sonner |
+| Data fetching | TanStack Query and server functions |
+| Backend | Supabase via Lovable Cloud |
+| Auth | Supabase auth with Lovable Cloud auth helpers |
+| Movie data | Curated TMDB-derived catalog plus live TMDB search/hydration |
+| AI | Lovable AI Gateway through the AI SDK |
+| Validation | Zod |
+| Charts | Recharts |
+| Tooling | TypeScript, ESLint, Prettier |
 
-Never expose `TMDB_API_KEY` or `LOVABLE_API_KEY` to the browser or commit them.
+## Environment Variables
+
+The app expects the following environment variables. Supabase values are commonly managed by Lovable Cloud, while TMDB and AI keys should be stored as server-side secrets.
+
+| Variable | Scope | Purpose |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | Client | Supabase project URL for browser code |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Client | Supabase publishable key for browser code |
+| `VITE_SUPABASE_PROJECT_ID` | Client | Supabase project id |
+| `SUPABASE_URL` | Server | Supabase project URL for server functions |
+| `SUPABASE_PUBLISHABLE_KEY` | Server | Publishable key for authenticated server requests |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server | Service role key for privileged server operations |
+| `TMDB_API_KEY` | Server | TMDB API key or read-access token |
+| `LOVABLE_API_KEY` | Server | Lovable AI Gateway key |
+| `LOVABLE_CRON_SECRET` | Server | Optional cron authentication secret |
+| `LOVABLE_CRON_SECRET_PREVIOUS` | Server | Optional rotated cron secret |
+
+Do not commit server secrets. `TMDB_API_KEY`, `LOVABLE_API_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` must never be exposed to browser code.
 
 ## Development
 
-Prefer working locally? You need Node.js and a package manager — the project uses `npm`/`bun`.
+Install dependencies and start the Vite development server:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 npm run dev
 ```
 
-Open `http://localhost:8080`.
+Open the local URL printed by Vite, usually:
+
+```txt
+http://localhost:8080
+```
 
 ## Scripts
 
-```sh
-npm run dev        # Start the Vite dev server
-npm run build      # Production build
-npm run build:dev  # Development build
-npm run preview    # Preview the production build
-npm run lint       # ESLint
-npm run format     # Prettier
-```
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Create a production build |
+| `npm run build:dev` | Create a development-mode build |
+| `npm run preview` | Preview the production build |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format files with Prettier |
 
 ## Deployment
 
-The app is configured for Lovable Cloud / Supabase and deploys through Lovable. To publish:
+Reel is configured for Lovable Cloud and Supabase-backed deployment.
 
-1. Make sure all required secrets are set in Lovable Cloud.
-2. Run `npm run build` to verify the build.
-3. Publish from the Lovable editor or push to the connected repository.
+1. Set the required Supabase, TMDB, and Lovable AI secrets.
+2. Run `npm run build` locally before publishing.
+3. Publish from Lovable or push to the connected repository branch.
 
-## Learn more
+This repository is connected to Lovable. Avoid force pushes, rebases, amend commits, or squash operations on published history because those actions can break Lovable's project history.
 
-- [Lovable docs](https://docs.lovable.dev)
-- [TanStack Start docs](https://tanstack.com/start)
-- [TMDB API docs](https://developer.themoviedb.org/reference)
+## Key Implementation Files
+
+| File | Why it matters |
+| --- | --- |
+| `src/lib/recommender.ts` | Core recommendation scoring, learning, explanations, penalties, and diversification |
+| `src/lib/app.functions.ts` | Server-side recommendation, action recording, feedback, and profile workflows |
+| `src/lib/extended-features.ts` | Deterministic semantic expansion from 15 core features to a richer movie vector |
+| `src/lib/filters.ts` | Hard filter matching and learned filter affinity |
+| `src/lib/tmdb.server.ts` | Remote movie search, entity discovery, and live movie hydration |
+| `src/lib/intent.server.ts` | AI-backed prompt and feedback parsing |
+| `src/lib/knowledge.server.ts` | AI-backed knowledge-base signal extraction |
+| `src/components/score-breakdown.tsx` | UI for explaining why a recommendation received its score |
+| `src/routes/profile.tsx` | User-facing taste profile, insight, and knowledge-base management |
+
+## References
+
+- [TanStack Start](https://tanstack.com/start)
+- [Supabase](https://supabase.com/docs)
+- [TMDB API](https://developer.themoviedb.org/reference)
+- [Lovable](https://lovable.dev)
