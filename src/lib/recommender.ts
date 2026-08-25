@@ -1,5 +1,6 @@
 import { ALL_FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
 import { EXTENDED_FEATURE_LABELS } from "@/lib/extended-features";
+import { affinityBonus, matchesFilters, type FilterAffinity, type MovieFilters } from "@/lib/filters";
 
 export const ALGORITHM_VERSION = "v1";
 
@@ -287,6 +288,10 @@ export type RankInput = {
   knowledge?: KnowledgeSignals[];
   /** Changes the exploration jitter so repeat asks surface different films. */
   seed?: number;
+  /** Hard constraints the viewer set with the filter bar. */
+  filters?: MovieFilters | null;
+  /** Learned filtering habits: a soft lean, applied even when no filter is set. */
+  affinity?: FilterAffinity | null;
 };
 
 /** Deterministic 0..1 pseudo-random from two integers. */
@@ -315,6 +320,8 @@ export function rankMovies({
   limit = 9,
   knowledge = [],
   seed = 0,
+  filters = null,
+  affinity = null,
 }: RankInput): ScoredMovie[] {
   const seen = new Map(interactions.map((i) => [i.movie_id, i]));
   const likedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === true);
@@ -336,6 +343,7 @@ export function rankMovies({
   const scored: ScoredMovie[] = [];
   for (const movie of MOVIES) {
     if (excludeIds.includes(movie.id)) continue;
+    if (!matchesFilters(movie, filters)) continue;
     const state = seen.get(movie.id);
     if (state?.watched || state?.liked === false) continue;
 
@@ -369,6 +377,8 @@ export function rankMovies({
       const closeness = semanticSimilarity(movie, dislikedMovies);
       score -= 0.12 * Math.max(0, closeness - 0.75);
     }
+    // Learned filtering habits lean the feed without excluding anything.
+    score += affinityBonus(movie, affinity);
     // Dismissed with the X: sink it to the bottom of the pile instead of removing it.
     score -= notInterestedPenalty(state);
     const isExact = Boolean(exactTitle && movie.title.toLowerCase().includes(exactTitle));
