@@ -1,6 +1,7 @@
 // Live TMDB access: any film in TMDB can enter the app, with semantic feature
 // vectors derived on the fly using the same rules as the bundled catalog.
 import { FEATURE_KEYS, type Movie } from "@/data/catalog";
+import { deriveExtendedFeatures } from "@/lib/extended-features";
 
 const BASE = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p/w500";

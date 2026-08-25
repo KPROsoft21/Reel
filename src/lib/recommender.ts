@@ -1,4 +1,5 @@
-import { FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
+import { ALL_FEATURE_KEYS, FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
+import { EXTENDED_FEATURE_LABELS } from "@/lib/extended-features";
 
 export const ALGORITHM_VERSION = "v1";
 
@@ -86,7 +87,7 @@ export type ScoredMovie = {
   fit: number;
 };
 
-export const FEATURE_LABELS: Record<string, string> = {
+const CORE_FEATURE_LABELS: Record<string, string> = {
   character_driven: "Character-driven",
   atmosphere: "Atmospheric",
   philosophical: "Philosophical",
@@ -138,7 +139,7 @@ function cosine(a: number[], b: number[]) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-const vec = (m: Movie) => FEATURE_KEYS.map((k) => m.features[k] ?? 0);
+const vec = (m: Movie) => ALL_FEATURE_KEYS.map((k) => m.features[k] ?? 0);
 
 /** Semantic similarity against liked movies (content-based retrieval signal). */
 export function semanticSimilarity(movie: Movie, likedMovies: Movie[]): number {
