@@ -19,29 +19,196 @@ Key user flows:
 
 ## Algorithm overview
 
-The engine is a hybrid scoring model, not a simple popularity list.
+Reel’s recommender is a hybrid, explainable scoring engine. It does not rank movies by popularity or by a single tag. Instead, every candidate gets a fit score built from dozens of signals: your explicit feedback, the words you typed, the filters you use, the movies you have already engaged with, and the semantic shape of each film.
 
-- **Core feature space** — 15 semantic dimensions per film (character-driven, atmosphere, philosophical, humor, tension, romance, visual style, slow burn, complexity, emotional intensity, realism, violence, world-building, dark tone, optimism).
-- **Extended metric layer** — 100+ additional metrics derived from genres, overviews, credits, and runtime (pacing, structure, subject matter, tone, craft, era, audience). These sit alongside the core features for finer-grained learning.
-- **Taste model** — `user_preferences` stores a learned preference value, confidence, importance, and evidence count per feature. Evidence comes from likes, dislikes, watches, saves, passes, and explicit knowledge-base notes.
-- **Scoring** — each candidate is ranked by a weighted blend of:
-  - preference matching against your learned model
-  - semantic similarity to the current intent or anchor film
-  - theme/intent alignment from your query
-  - novelty / discovery nudges
-  - filter affinity (decades, genres, rating, runtime habits)
-  - era bias favoring 2000s–2020s Hollywood unless your history shows otherwise
-  - a decaying “not interested” penalty that buries passed films for ~4 months
-- **Exclusions** — anything already liked, disliked, watched, or saved is never recommended again.
-- **Explainability** — every recommendation can return a `ScoreBreakdown` showing the signals, weights, and adjustments that produced the fit %.
+### 1. Feature space — how a movie is represented
 
-AI is used in three places:
+Every movie is converted into a numeric feature vector so the algorithm can compare films and compare them to your taste.
 
-1. Parsing free-form mood queries into structured intent (`src/lib/intent.server.ts`).
-2. Summarizing knowledge-base notes into structured taste signals (`src/lib/knowledge.server.ts`).
-3. Generating the narrative “How the algorithm reads you” summary on the profile (`src/lib/taste-summary.server.ts`).
+#### Core features (15 dimensions)
 
-All model calls route through the Lovable AI Gateway.
+Each film receives a score from 0 to 1 on:
+
+1. Character-driven
+2. Atmosphere / mood
+3. Philosophical / thematic depth
+4. Humor
+5. Tension / suspense
+6. Romance
+7. Visual style
+8. Slow burn
+9. Complexity
+10. Emotional intensity
+11. Realism
+12. Violence / action intensity
+13. World-building
+14. Dark tone
+15. Optimism
+
+These are derived from a combination of the curated catalog, TMDB genres and keywords, and the film’s overview text. They form the primary language the taste model speaks.
+
+#### Extended metric layer (100+ dimensions)
+
+On top of the core 15, the engine derives more than 100 additional metrics from runtime, release year, genres, cast/crew, overview sentiment, and inferred pacing. Examples include:
+
+- Pacing: fast-paced, deliberate, episodic, tightly plotted
+- Structure: twist-heavy, franchise film, ensemble cast, single-location
+- Subject matter: based on true events, crime, family, sci-fi concepts
+- Tone: gritty, whimsical, melancholic, uplifting
+- Craft: blockbuster scale, indie sensibility, high rewatchability
+- Era & audience: classic Hollywood, 2000s studio film, modern streaming
+
+The extended layer is used for similarity calculations and for fine-grained learning, but it does not overwhelm the core taste model. Core features drive the headline preference; extended features refine the match.
+
+### 2. Taste model — how the algorithm learns you
+
+Your taste is stored in `user_preferences` as a set of learned feature records. Each record contains:
+
+- `feature` — the dimension name (e.g. “humor”, “dark tone”)
+- `preference` — a value from -1 (strongly dislike) to +1 (strongly like)
+- `confidence` — how sure the model is about that preference (0 to 1)
+- `importance` — how much that feature should influence ranking (0 to 1)
+- `evidence_count` — how many interactions support the learned value
+- `positive_evidence` / `negative_evidence` — counts of likes vs passes/dislikes
+
+#### Where evidence comes from
+
+Every interaction updates the model:
+
+| Action | Signal sent |
+|--------|-------------|
+| Like | Strong positive for the film’s features; also marks the film as watched |
+| Save / add to list | Moderate positive; the film is treated as a future watch |
+| Watched | Mild positive for features; used to avoid re-recommending |
+| Dislike | Strong negative for the film’s features |
+| Pass / X / Not interested | Mild-to-moderate negative; the film is buried for ~4 months with a decaying penalty |
+| Knowledge-base note | Parsed by AI into structured signals and merged into the taste model |
+
+#### Learning math
+
+When an interaction arrives, the engine:
+
+1. Looks up the movie’s feature vector.
+2. Computes a signed weight for the action (like = +1.0, dislike = -1.0, save = +0.5, watched = +0.3, pass = -0.4, etc.).
+3. Updates each feature with a weighted moving average:
+   - `new_preference = (old_preference * old_evidence + feature_value * action_weight) / total_evidence`
+   - `confidence` grows as evidence accumulates but is capped.
+   - `importance` rises when a feature repeatedly distinguishes likes from passes.
+4. Stores the updated row so future recommendations use it immediately.
+
+This means the algorithm does not just count genres. If you like three dark, slow-burn thrillers and pass on a dark comedy, it learns that “dark tone” is good but “humor” may not be the reason.
+
+### 3. Scoring a recommendation
+
+For every candidate movie, the engine computes a final fit score from several blended components.
+
+#### Base preference match
+
+The candidate’s core feature vector is compared against your taste model:
+
+```
+preference_score = Σ (user_preference[i] * candidate_value[i] * importance[i] * confidence[i])
+```
+
+Features where you have strong, confident preferences contribute more. If your model is still empty, this term is neutral and the engine relies more on discovery and query signals.
+
+#### Semantic similarity
+
+If the request has an anchor — a search result, a selected film, a person, a franchise, or a studio — the candidate is compared to that anchor using cosine similarity over the extended feature vector. This powers “More like this” and entity searches.
+
+```
+similarity_score = cosine(candidate_vector, anchor_vector)
+```
+
+#### Intent alignment
+
+When you type a mood query (“something tense and atmospheric”), the AI parses it into a structured intent with boosted features and optional filters. The candidate gets extra points for matching those requested features.
+
+```
+intent_score = Σ (intent_boost[i] * candidate_value[i])
+```
+
+#### Filter affinity
+
+Filters (release decade, genre, minimum rating, runtime, certification) are applied in two ways:
+
+- **Hard filters**: if a candidate fails a filter you explicitly set, it is excluded.
+- **Soft affinity**: the algorithm tracks which decades, genres, and runtime ranges you tend to engage with and quietly nudges matching candidates upward.
+
+Filter affinity is learned from your behavior, not just your explicit choices.
+
+#### Era bias
+
+The app is intentionally biased toward films from the 2000s through the 2020s and toward Hollywood studio productions, unless your history clearly shows a love for older or non-Hollywood cinema. The engine detects an `oldSchoolTaste` signal from your likes and saves; if it is absent, recent releases receive a small but persistent boost.
+
+#### Discovery / novelty nudge
+
+To prevent the feed from collapsing into one narrow type, a small random jitter and a novelty bonus are added. This ensures variety without overriding your clear preferences.
+
+#### Not-interested penalty
+
+Pressing X on a card records a “not interested” interaction. The film receives a large, decaying penalty that drops over roughly 120 days. It is not treated as a dislike — the algorithm understands it as “the user did not show interest right now” — so the penalty fades and the film can reappear later if other signals strongly support it.
+
+#### Final score
+
+```
+raw_score = w_pref * preference_score
+        + w_sim * similarity_score
+        + w_intent * intent_score
+        + w_filter * filter_affinity
+        + w_era * era_bias
+        + w_discovery * discovery_nudge
+        - w_not_interested * decaying_penalty
+
+fit_percent = clamp( normalize(raw_score), 30%, 95% )
+```
+
+The normalization is calibrated so that 100% is rare. Most recommendations fall between 60% and 92%, giving the score meaning and room to improve as the model learns.
+
+### 4. Exclusions — what never gets recommended
+
+A candidate is removed from the feed if any of the following are true:
+
+- You liked it
+- You disliked it
+- You saved it
+- You marked it as watched
+- You passed on it and the decaying penalty is still strong
+- It is the currently viewed movie (on the detail page)
+
+This keeps the feed fresh and respects your explicit decisions.
+
+### 5. Search and disambiguation
+
+The search bar is not a simple title lookup.
+
+1. **Title match**: if your query closely matches a film title, that film is boosted to the top with a 100% fit score and treated as an anchor.
+2. **Entity resolution**: the query is also sent to TMDB to find people (actors, directors), franchises, studios, and collections.
+3. **Disambiguation**: if the query is ambiguous (e.g. “marvel”), the UI shows ranked “Did you mean…” chips — person, studio, franchise — instead of guessing.
+4. **Result blending**: once an entity is selected, the engine fetches up to 80 related films, scores them with the full recommender, and blends them with title matches and personalized picks.
+
+### 6. Explainability — why this pick?
+
+Every recommendation can produce a `ScoreBreakdown` that lists:
+
+- Which features helped the score (e.g. “matches your preference for dark tone”)
+- Which features hurt it (e.g. “lower than your usual optimism score”)
+- The intent match contribution
+- The similarity contribution if anchored to another film
+- The filter and era adjustments
+- The not-interested penalty if present
+
+This breakdown is shown on movie cards, in the detail page, and in the profile’s “Info” section.
+
+### 7. AI’s role in the algorithm
+
+AI is used for understanding language, not for replacing the scoring math. There are three AI-powered parsers:
+
+1. **Intent parser** (`src/lib/intent.server.ts`) — turns mood queries into structured feature boosts and filter hints.
+2. **Knowledge-base parser** (`src/lib/knowledge.server.ts`) — turns free-form notes like “I love Christopher Nolan but I’m tired of superhero movies” into structured taste signals.
+3. **Taste narrative generator** (`src/lib/taste-summary.server.ts`) — reads your learned preferences and produces a human-readable summary of what the algorithm thinks about your taste and why.
+
+The actual ranking, learning, and scoring are deterministic and run in `src/lib/recommender.ts`.
 
 ## Tech stack
 
