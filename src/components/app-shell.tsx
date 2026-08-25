@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Sheet>
 
         <Link to="/" className="flex items-center gap-2 font-display text-xl tracking-tight">
-          <img src={reelLogo.url} alt="Reel logo" className="size-7 object-contain" />
+          <img src={reelLogo} alt="Reel logo" className="size-8 object-contain" />
           Reel
         </Link>
 
