@@ -5,7 +5,7 @@
   <p>
     <a href="#product-overview">Overview</a> |
     <a href="#features">Features</a> |
-    <a href="https://reel-xi-eight.vercel.app/">Site</a>|
+    <a href="https://reel-kprosoft.vercel.app/">Site</a> |
     <a href="#recommendation-engine">Algorithm</a> |
     <a href="#development">Development</a> |
     <a href="#deployment">Deployment</a>
