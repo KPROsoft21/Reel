@@ -190,22 +190,24 @@ export const recordAction = createServerFn({ method: "POST" })
 
     if (action === "like" || action === "dislike" || action === "clear_rating") {
       const liked = action === "clear_rating" ? null : action === "like";
-      const watched = action === "like" ? true : undefined;
+      const interactionUpdate: Record<string, unknown> = {
+        user_id: userId,
+        movie_id: movieId,
+        liked,
+        rated_at: now,
+        updated_at: now,
+      };
+      if (action === "like") {
+        interactionUpdate.watched = true;
+        interactionUpdate.watched_at = now;
+      }
       await supabase
         .from("user_movie_interactions")
-        .upsert({
-          user_id: userId,
-          movie_id: movieId,
-          liked,
-          watched,
-          rated_at: now,
-          watched_at: watched ? now : undefined,
-          updated_at: now,
-        }, { onConflict: "user_id,movie_id" });
+        .upsert(interactionUpdate, { onConflict: "user_id,movie_id" });
       if (liked !== null) {
         await learnFrom(supabase, userId, movieId, liked ? 1 : -1, liked ? "liked_movie" : "disliked_movie");
       }
-      if (watched) {
+      if (action === "like") {
         await supabase
           .from("watchlists")
           .upsert({ user_id: userId, movie_id: movieId, status: "watched", watched_at: now, removed_at: null }, { onConflict: "user_id,movie_id" });
