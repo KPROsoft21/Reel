@@ -432,7 +432,7 @@ export const recordAction = createServerFn({ method: "POST" })
 
     // Everything that doesn't depend on another write runs concurrently:
     // the round-trips dominate, so serialising them made clicks feel slow.
-    const jobs: Promise<unknown>[] = [
+    const jobs: PromiseLike<unknown>[] = [
       supabase.from("movie_interaction_events").insert({ user_id: userId, movie_id: movieId, event_type: action }),
     ];
 
