@@ -237,6 +237,36 @@ export type Database = {
           },
         ]
       }
+      user_filter_affinity: {
+        Row: {
+          decade_counts: Json
+          genre_counts: Json
+          rating_min_avg: number | null
+          runtime_max_avg: number | null
+          updated_at: string
+          user_id: string
+          uses: number
+        }
+        Insert: {
+          decade_counts?: Json
+          genre_counts?: Json
+          rating_min_avg?: number | null
+          runtime_max_avg?: number | null
+          updated_at?: string
+          user_id: string
+          uses?: number
+        }
+        Update: {
+          decade_counts?: Json
+          genre_counts?: Json
+          rating_min_avg?: number | null
+          runtime_max_avg?: number | null
+          updated_at?: string
+          user_id?: string
+          uses?: number
+        }
+        Relationships: []
+      }
       user_knowledge: {
         Row: {
           active: boolean
