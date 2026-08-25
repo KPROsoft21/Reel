@@ -317,6 +317,9 @@ export function rankMovies({
     const ctx = intentMatch(movie, intent);
     if (ctx.hardFail) continue;
 
+    const kb = knowledgeMatch(movie, knowledge);
+    if (kb.hardFail) continue;
+
     const preference = preferenceMatch(movie, prefs);
     const semantic = semanticSimilarity(movie, likedMovies);
     const theme = themeMatch(movie, prefs);
@@ -329,6 +332,7 @@ export function rankMovies({
       W.semantic * semantic +
       W.theme * theme +
       W.context * ctx.score +
+      W.knowledge * kb.score +
       (W.rating * (movie.rating - 6)) / 3 +
       W.novelty * novelty +
       W.discovery * discovery +
@@ -346,9 +350,10 @@ export function rankMovies({
       movie,
       score,
       components: { preference, semantic, theme, novelty, discovery, context: ctx.score, popularity },
-      reasons: explain(movie, prefs, intent, ctx.score),
+      reasons: [...kb.reasons, ...explain(movie, prefs, intent, ctx.score)].slice(0, 3),
       fit: Math.round(clamp01(0.3 + (searching ? ctx.score : score) * 0.75) * 100),
     });
+
   }
 
   scored.sort((a, b) => b.score - a.score);
