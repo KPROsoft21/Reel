@@ -87,7 +87,7 @@ export function KnowledgeBase() {
           entries.map((entry) => (
             <article
               key={entry.id}
-              className={`chamfer hairline bg-surface p-4 transition-opacity ${entry.active ? "" : "opacity-50"}`}
+              className={`chamfer hairline bg-background p-4 transition-opacity ${entry.active ? "" : "opacity-50"}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
