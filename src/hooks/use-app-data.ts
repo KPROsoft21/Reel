@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 
 import { getSnapshot, recordAction, updateProfile, correctTag, submitFeedback } from "@/lib/app.functions";
+import { registerMovies } from "@/lib/movie-registry";
 import { useSession } from "./use-session";
 
 export type MovieAction =
