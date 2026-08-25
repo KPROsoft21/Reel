@@ -436,6 +436,9 @@ export function rankMovies({
     }
     // Learned filtering habits lean the feed without excluding anything.
     score += affinityBonus(movie, affinity);
+    // House lean toward recent, mainstream-Hollywood cinema.
+    score += eraBias(movie, oldTaste);
+
     // Dismissed with the X: sink it to the bottom of the pile instead of removing it.
     score -= notInterestedPenalty(state);
     const isExact = Boolean(exactTitle && movie.title.toLowerCase().includes(exactTitle));
