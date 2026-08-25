@@ -32,6 +32,8 @@ const asInteractions = (rows: unknown[]): InteractionState[] =>
     movie_id: Number(r.movie_id),
     watched: !!r.watched,
     liked: r.liked ?? null,
+    not_interested_at: r.not_interested_at ?? null,
+    not_interested_count: r.not_interested_count ?? 0,
   }));
 
 /** Everything the shell needs: profile, lists, taste model. */
@@ -41,7 +43,7 @@ export const getSnapshot = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const [profile, interactions, watchlist, prefs] = await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
-      supabase.from("user_movie_interactions").select("movie_id, watched, liked, rating, updated_at").eq("user_id", userId),
+      supabase.from("user_movie_interactions").select("movie_id, watched, liked, rating, updated_at, not_interested_at, not_interested_count").eq("user_id", userId),
       supabase.from("watchlists").select("movie_id, status, added_at, watched_at").eq("user_id", userId).neq("status", "removed"),
       supabase.from("user_preferences").select("*").eq("user_id", userId),
     ]);
@@ -97,7 +99,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
 
     const [prefsRes, interactionsRes, knowledgeRes] = await Promise.all([
       supabase.from("user_preferences").select("*").eq("user_id", userId),
-      supabase.from("user_movie_interactions").select("movie_id, watched, liked").eq("user_id", userId),
+      supabase.from("user_movie_interactions").select("movie_id, watched, liked, not_interested_at, not_interested_count").eq("user_id", userId),
       supabase.from("user_knowledge").select("signals").eq("user_id", userId).eq("active", true),
     ]);
     const prefs = asPrefs(prefsRes.data ?? []);
@@ -288,7 +290,7 @@ async function learnFrom(
 
 const ActionSchema = z.object({
   movieId: z.number(),
-  action: z.enum(["like", "dislike", "clear_rating", "watched", "unwatched", "add_list", "remove_list", "opened"]),
+  action: z.enum(["like", "dislike", "clear_rating", "watched", "unwatched", "add_list", "remove_list", "opened", "not_interested"]),
 });
 
 export const recordAction = createServerFn({ method: "POST" })
@@ -361,6 +363,27 @@ export const recordAction = createServerFn({ method: "POST" })
         .update({ status: "removed", removed_at: now })
         .eq("user_id", userId)
         .eq("movie_id", movieId);
+    }
+
+    if (action === "not_interested") {
+      const { data: existing } = await supabase
+        .from("user_movie_interactions")
+        .select("not_interested_count")
+        .eq("user_id", userId)
+        .eq("movie_id", movieId)
+        .maybeSingle();
+      await supabase.from("user_movie_interactions").upsert(
+        {
+          user_id: userId,
+          movie_id: movieId,
+          not_interested_at: now,
+          not_interested_count: (existing?.not_interested_count ?? 0) + 1,
+          updated_at: now,
+        },
+        { onConflict: "user_id,movie_id" },
+      );
+      // Weak negative: no interest shown, not a dislike.
+      await learnFrom(supabase, userId, movieId, -1, "not_interested");
     }
 
     if (action === "opened") {

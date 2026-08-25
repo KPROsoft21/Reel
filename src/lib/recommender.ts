@@ -52,7 +52,23 @@ export type InteractionState = {
   movie_id: number;
   watched: boolean;
   liked: boolean | null;
+  /** When the viewer pressed "not interested" — a disinterest signal, not a dislike. */
+  not_interested_at?: string | null;
+  not_interested_count?: number;
 };
+
+/**
+ * "Not interested" buries a film rather than banning it. The penalty is big
+ * enough that it only resurfaces when little else fits, and it fades over
+ * roughly four months (longer if dismissed repeatedly).
+ */
+export function notInterestedPenalty(state: InteractionState | undefined): number {
+  if (!state?.not_interested_at) return 0;
+  const days = (Date.now() - new Date(state.not_interested_at).getTime()) / 86_400_000;
+  const window = 120 * Math.max(1, state.not_interested_count ?? 1);
+  const freshness = Math.max(0, 1 - days / window);
+  return 0.9 * freshness * Math.min(2, state.not_interested_count ?? 1);
+}
 
 export type ScoredMovie = {
   movie: Movie;
@@ -350,6 +366,8 @@ export function rankMovies({
       const closeness = semanticSimilarity(movie, dislikedMovies);
       score -= 0.12 * Math.max(0, closeness - 0.75);
     }
+    // Dismissed with the X: sink it to the bottom of the pile instead of removing it.
+    score -= notInterestedPenalty(state);
     if (exactTitle && movie.title.toLowerCase().includes(exactTitle)) score += 1;
 
     scored.push({
@@ -420,6 +438,7 @@ export const EVIDENCE_WEIGHT: Record<string, number> = {
   watched: 0.4,
   added_to_list: 0.35,
   opened: 0.12,
+  not_interested: 0.08,
   shown: 0.03,
 };
 
