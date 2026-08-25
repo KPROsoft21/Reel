@@ -99,6 +99,12 @@ function Profile() {
         </div>
       </section>
 
+      <div className="mb-10">
+        <KnowledgeBase />
+      </div>
+
+
+
       <section className="grid grid-cols-3 gap-3">
         {[
           ["Watched", stats.watched],
