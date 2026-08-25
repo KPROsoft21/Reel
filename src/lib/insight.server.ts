@@ -1,6 +1,7 @@
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { EMPTY_AFFINITY, type FilterAffinity } from "@/lib/filters";
 import {
+  EVIDENCE_WEIGHT,
   FEATURE_LABELS,
   eraBias,
   oldSchoolTaste,
@@ -63,17 +64,6 @@ export function buildInsight(input: {
 
   const counts = new Map<string, number>();
   for (const r of evidenceRows) counts.set(r.evidence_type, (counts.get(r.evidence_type) ?? 0) + 1);
-  const EVIDENCE_WEIGHTS: Record<string, number> = {
-    explicit_correction: 1.0,
-    explicit_feedback: 0.9,
-    liked_movie: 0.75,
-    disliked_movie: 0.75,
-    watched: 0.4,
-    added_to_list: 0.35,
-    opened: 0.12,
-    not_interested: 0.08,
-    shown: 0.03,
-  };
 
   const likedMovies = interactions
     .filter((i) => i.liked === true)
@@ -104,7 +94,7 @@ export function buildInsight(input: {
       opened: openedCount,
     },
     evidenceMix: [...counts.entries()]
-      .map(([type, count]) => ({ type, count, weight: EVIDENCE_WEIGHTS[type] ?? 0.2 }))
+      .map(([type, count]) => ({ type, count, weight: EVIDENCE_WEIGHT[type] ?? 0.2 }))
       .sort((a, b) => b.count - a.count),
     top: byPull.filter((f) => f.pull > 0).slice(0, 10),
     bottom: byPull.filter((f) => f.pull < 0).reverse().slice(0, 10),
