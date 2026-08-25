@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useSnapshot } from "@/hooks/use-app-data";
 import { cn } from "@/lib/utils";
+import reelLogo from "@/assets/reel-logo.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -61,7 +62,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SheetContent>
         </Sheet>
 
-        <Link to="/" className="font-display text-xl tracking-tight">
+        <Link to="/" className="flex items-center gap-2 font-display text-xl tracking-tight">
+          <img src={reelLogo.url} alt="Reel logo" className="size-7 object-contain" />
           Reel
         </Link>
 
