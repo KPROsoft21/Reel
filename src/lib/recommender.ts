@@ -449,39 +449,59 @@ export function rankMovies({
     const discovery = discoveryValue(movie, prefs, profileMaturity);
     const popularity = clamp01(movie.popularity);
 
-    let score =
-      W.preference * preference +
-      W.semantic * semantic +
-      W.theme * theme +
-      W.context * ctx.score +
-      W.knowledge * kb.score +
-      (W.rating * (movie.rating - 6)) / 3 +
-      W.novelty * novelty +
-      W.discovery * discovery +
-      W.popularity * popularity +
-      W.jitter * jitter(seed, movie.id);
+    const ratingSignal = clamp01((movie.rating - 6) / 3);
+    const jit = jitter(seed, movie.id);
+
+    const lines: ScoreLine[] = [
+      { key: "preference", label: "Taste model match", value: preference, weight: W.preference, contribution: W.preference * preference, hint: "How well the film's traits line up with the features you've shown you value." },
+      { key: "semantic", label: "Similar to films you liked", value: semantic, weight: W.semantic, contribution: W.semantic * semantic, hint: "Cosine similarity against your three closest liked films." },
+      { key: "theme", label: "Theme overlap", value: theme, weight: W.theme, contribution: W.theme * theme, hint: "Strength of the themes you consistently gravitate toward." },
+      { key: "context", label: "Matches your request", value: ctx.score, weight: W.context, contribution: W.context * ctx.score, hint: "Fit with the mood, search or anchor film for this feed." },
+      { key: "knowledge", label: "Your written rules", value: kb.score, weight: W.knowledge, contribution: W.knowledge * kb.score, hint: "Your knowledge-base notes about genres, people and keywords." },
+      { key: "rating", label: "Critical standing", value: ratingSignal, weight: W.rating, contribution: (W.rating * (movie.rating - 6)) / 3, hint: `Audience rating ${movie.rating.toFixed(1)}/10, centred on 6.0.` },
+      { key: "novelty", label: "Off the beaten path", value: novelty, weight: W.novelty, contribution: W.novelty * novelty, hint: "Rewards films you're less likely to have already seen everywhere." },
+      { key: "discovery", label: "Learning value", value: discovery, weight: W.discovery, contribution: W.discovery * discovery, hint: "How much your reaction would teach the model something it's unsure about." },
+      { key: "popularity", label: "Broad appeal", value: popularity, weight: W.popularity, contribution: W.popularity * popularity, hint: "A small pull toward films most people enjoy." },
+      { key: "jitter", label: "Exploration shuffle", value: jit, weight: W.jitter, contribution: W.jitter * jit, hint: "Deterministic randomness so repeat asks surface different films." },
+    ].filter((l) => l.weight > 0);
+
+    let score = lines.reduce((s, l) => s + l.contribution, 0);
+    const weighted = score;
+    const adjustments: { label: string; value: number; hint: string }[] = [];
 
     // Penalty: too close to something the user explicitly disliked.
     if (dislikedMovies.length) {
       const closeness = semanticSimilarity(movie, dislikedMovies);
-      score -= 0.12 * Math.max(0, closeness - 0.75);
+      const pen = -0.12 * Math.max(0, closeness - 0.75);
+      score += pen;
+      if (pen) adjustments.push({ label: "Close to something you disliked", value: pen, hint: `Similarity ${Math.round(closeness * 100)}% to a film you rated down.` });
     }
     // Learned filtering habits lean the feed without excluding anything.
-    score += affinityBonus(movie, affinity);
+    const aff = affinityBonus(movie, affinity);
+    score += aff;
+    if (aff) adjustments.push({ label: "Your filtering habits", value: aff, hint: "Learned from the eras, genres and ratings you keep filtering for." });
     // House lean toward recent, mainstream-Hollywood cinema.
-    score += eraBias(movie, oldTaste);
+    const era = eraBias(movie, oldTaste);
+    score += era;
+    if (era) adjustments.push({ label: `Era lean (${movie.year})`, value: era, hint: `House bias toward modern, mostly-Hollywood cinema. Your old-film appetite reads ${Math.round(oldTaste * 100)}%.` });
 
     // Dismissed with the X: sink it to the bottom of the pile instead of removing it.
-    score -= notInterestedPenalty(state);
+    const dismissPen = notInterestedPenalty(state);
+    score -= dismissPen;
+    if (dismissPen) adjustments.push({ label: "You passed on this before", value: -dismissPen, hint: "A decaying penalty from pressing X — it fades over about four months." });
+
     const isExact = Boolean(exactTitle && movie.title.toLowerCase().includes(exactTitle));
-    if (isExact) score += 1;
+    if (isExact) {
+      score += 1;
+      adjustments.push({ label: "Exact title match", value: 1, hint: "You searched for this film by name." });
+    }
 
     // Fit is a calibrated read of the blended score, not of any single signal.
     // Normalising against the weight budget keeps the displayed range honest
     // (an entity search alone no longer pins everything at 100%).
     const budget =
       W.preference + W.semantic + W.theme + W.context + W.knowledge + W.novelty + W.discovery + W.popularity;
-    const quality = clamp01((score - W.jitter * jitter(seed, movie.id)) / (budget * 0.82));
+    const quality = clamp01((score - W.jitter * jit) / (budget * 0.82));
     const fit = isExact ? 99 : Math.round(28 + 66 * Math.pow(quality, 0.85));
 
     scored.push({
@@ -490,7 +510,18 @@ export function rankMovies({
       components: { preference, semantic, theme, novelty, discovery, context: ctx.score, popularity },
       reasons: [...kb.reasons, ...explain(movie, prefs, intent, ctx.score)].slice(0, 3),
       fit,
+      breakdown: {
+        lines,
+        adjustments,
+        weighted,
+        budget,
+        total: score,
+        quality,
+        fit,
+        mode: searching ? "search" : "feed",
+      },
     });
+
 
 
   }
