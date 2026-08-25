@@ -86,12 +86,22 @@ export const getRecommendations = createServerFn({ method: "POST" })
 
     let intent: Intent = { positive: {}, negative: {}, summary: "" };
     let notice: string | undefined;
-    const anchor = data.similarToMovieId ? MOVIES_BY_ID.get(data.similarToMovieId) : undefined;
+    const anchor = data.similarToMovieId
+      ? MOVIES_BY_ID.get(data.similarToMovieId) ?? (await tmdbMovie(data.similarToMovieId)) ?? undefined
+      : undefined;
 
     // A typed title is a direct lookup: show the film itself, then films like it.
-    const titleHits = anchor || !data.query.trim()
-      ? []
-      : searchTitles(data.query.trim()).filter((m) => !data.excludeIds.includes(m.id));
+    // Local catalog first, then all of TMDB so every film is reachable.
+    const q = data.query.trim();
+    let titleHits = anchor || !q ? [] : searchTitles(q).filter((m) => !data.excludeIds.includes(m.id));
+    if (!anchor && q.length >= 2) {
+      const remote = await tmdbSearch(q, 6);
+      const known = new Set([...titleHits.map((m) => m.id), ...data.excludeIds]);
+      const extraHits = remote
+        .filter((m) => !known.has(m.id) && titleMatchScore(q, m.title) >= 0.6)
+        .slice(0, titleHits.length ? 2 : 4);
+      titleHits = [...titleHits, ...extraHits];
+    }
     const topHit = titleHits[0];
 
     if (anchor) {
@@ -111,8 +121,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
         summary: `${topHit.title} and films like it`,
         exact_title: topHit.title,
       };
-    } else if (data.query.trim()) {
-      const parsed = await interpretIntent(data.query.trim());
+    } else if (q) {
+      const parsed = await interpretIntent(q);
       intent = parsed.intent;
       notice = parsed.notice;
     }
@@ -138,6 +148,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
     }));
 
     const ranked = [...hitScored, ...filler].slice(0, data.limit);
+    const extras = ranked.map((r) => r.movie).filter((m) => !MOVIES_BY_ID.has(m.id));
 
 
 
