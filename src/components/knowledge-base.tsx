@@ -41,14 +41,11 @@ export function KnowledgeBase() {
   };
 
   return (
-    <section>
-      <h2 className="font-display text-2xl">Knowledge base</h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Tell the recommender anything about your taste in plain language. It summarises each note and applies it to every
-        future pick.
-      </p>
-
-      <div className="chamfer hairline mt-5 bg-surface p-5">
+    <CollapsibleSection
+      title="Knowledge base"
+      description="Tell the recommender anything about your taste in plain language. It summarises each note and applies it to every future pick."
+    >
+      <div className="chamfer hairline bg-surface p-5">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
