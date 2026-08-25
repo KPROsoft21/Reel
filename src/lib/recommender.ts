@@ -1,4 +1,4 @@
-import { ALL_FEATURE_KEYS, FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
+import { ALL_FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
 import { EXTENDED_FEATURE_LABELS } from "@/lib/extended-features";
 
 export const ALGORITHM_VERSION = "v1";
