@@ -188,30 +188,32 @@ export const recordAction = createServerFn({ method: "POST" })
 
     await supabase.from("movie_interaction_events").insert({ user_id: userId, movie_id: movieId, event_type: action });
 
-    if (action === "like" || action === "dislike" || action === "clear_rating") {
-      const liked = action === "clear_rating" ? null : action === "like";
-      const interactionUpdate: Record<string, unknown> = {
-        user_id: userId,
-        movie_id: movieId,
-        liked,
-        rated_at: now,
-        updated_at: now,
-      };
-      if (action === "like") {
-        interactionUpdate.watched = true;
-        interactionUpdate.watched_at = now;
-      }
+    if (action === "like") {
       await supabase
         .from("user_movie_interactions")
-        .upsert(interactionUpdate, { onConflict: "user_id,movie_id" });
-      if (liked !== null) {
-        await learnFrom(supabase, userId, movieId, liked ? 1 : -1, liked ? "liked_movie" : "disliked_movie");
-      }
-      if (action === "like") {
-        await supabase
-          .from("watchlists")
-          .upsert({ user_id: userId, movie_id: movieId, status: "watched", watched_at: now, removed_at: null }, { onConflict: "user_id,movie_id" });
-        await learnFrom(supabase, userId, movieId, 1, "watched");
+        .upsert({
+          user_id: userId,
+          movie_id: movieId,
+          liked: true,
+          watched: true,
+          rated_at: now,
+          watched_at: now,
+          updated_at: now,
+        }, { onConflict: "user_id,movie_id" });
+      await supabase
+        .from("watchlists")
+        .upsert({ user_id: userId, movie_id: movieId, status: "watched", watched_at: now, removed_at: null }, { onConflict: "user_id,movie_id" });
+      await learnFrom(supabase, userId, movieId, 1, "liked_movie");
+      await learnFrom(supabase, userId, movieId, 1, "watched");
+    }
+
+    if (action === "dislike" || action === "clear_rating") {
+      const liked = action === "clear_rating" ? null : false;
+      await supabase
+        .from("user_movie_interactions")
+        .upsert({ user_id: userId, movie_id: movieId, liked, rated_at: now, updated_at: now }, { onConflict: "user_id,movie_id" });
+      if (action === "dislike") {
+        await learnFrom(supabase, userId, movieId, -1, "disliked_movie");
       }
     }
 
