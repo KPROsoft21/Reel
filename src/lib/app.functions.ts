@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
 import { searchTitles, titleMatchScore } from "./title-search";
-import { tmdbMovie, tmdbSearch } from "./tmdb.server";
+import { tmdbEntitySearch, tmdbMovie, tmdbSearch } from "./tmdb.server";
 
 import {
   ALGORITHM_VERSION,
@@ -179,7 +179,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
       movie,
       score: 2,
       components: { preference: 0, semantic: 1, theme: 0, novelty: 0, discovery: 0, context: 1, popularity: movie.popularity },
-      reasons: ["Matches the title you searched"],
+      reasons: [entity ? `${entityReason[entity.kind]} ${entity.label}` : "Matches the title you searched"],
       fit: 100,
     }));
 
