@@ -300,6 +300,59 @@ function jitter(seed: number, id: number): number {
   return x - Math.floor(x);
 }
 
+/**
+ * How much this viewer actually reaches for older cinema, 0..1. Built from the
+ * films they liked/watched and the decades they filter for. At 0 the feed is
+ * pushed hard toward modern Hollywood; near 1 the era bias all but disappears.
+ */
+export function oldSchoolTaste(
+  likedMovies: Movie[],
+  interactions: InteractionState[],
+  affinity?: FilterAffinity | null,
+): number {
+  const engagedIds = new Set(
+    interactions.filter((i) => i.watched || i.liked === true).map((i) => i.movie_id),
+  );
+  const engaged = MOVIES.filter((m) => engagedIds.has(m.id) || likedMovies.includes(m));
+  let signal = 0;
+  if (engaged.length >= 3) {
+    const oldShare = engaged.filter((m) => m.year < 1990).length / engaged.length;
+    signal = Math.max(signal, clamp01(oldShare * 2));
+  }
+  if (affinity && affinity.uses >= 2) {
+    const counts = affinity.decades ?? {};
+    const total = Object.values(counts).reduce((s, n) => s + n, 0);
+    if (total) {
+      const oldKeys = ["Classic", "60s", "70s", "80s"];
+      const oldHits = oldKeys.reduce((s, k) => s + (counts[k] ?? 0), 0);
+      signal = Math.max(signal, clamp01((oldHits / total) * 1.5));
+    }
+  }
+  return signal;
+}
+
+/**
+ * The house lean: modern, mostly-Hollywood films unless the viewer has shown
+ * real appetite for older or international cinema. Older films aren't blocked —
+ * a strong enough fit still gets through.
+ */
+export function eraBias(movie: Movie, oldTaste: number): number {
+  const damp = 1 - clamp01(oldTaste);
+  const y = movie.year;
+  let b: number;
+  if (y >= 2015) b = 0.1;
+  else if (y >= 2000) b = 0.07;
+  else if (y >= 1990) b = -0.02;
+  else if (y >= 1980) b = -0.09;
+  else if (y >= 1970) b = -0.22;
+  else b = -0.32;
+  // Positive nudges stay; the penalties soften for viewers who like old films.
+  const era = b >= 0 ? b : b * damp;
+  const international = (movie.features["origin_international"] ?? 0) > 0.6 ? -0.05 * damp : 0;
+  return era + international;
+}
+
+
 function hasIntentSignal(intent: Intent): boolean {
   return Boolean(
     Object.keys(intent.positive ?? {}).length ||
