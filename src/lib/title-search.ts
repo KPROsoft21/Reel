@@ -27,8 +27,8 @@ export function searchTitles(rawQuery: string, limit = 4): Movie[] {
 
     let score = 0;
     if (t === q) score = 1;
-    else if (t.startsWith(q) || q.startsWith(t)) score = 0.9;
-    else if (t.includes(q)) score = 0.8;
+    else if (t.length >= 3 && q.length >= 3 && (t.startsWith(q) || q.startsWith(t))) score = 0.9;
+    else if (q.length >= 4 && t.includes(q)) score = 0.8;
     else {
       const hits = qWords.filter((w) => tWords.some((tw) => tw === w || (w.length > 4 && tw.startsWith(w))));
       const coverage = hits.length / qWords.length;
