@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 import { RequireAuth } from "@/components/require-auth";
-import { MovieGrid } from "@/components/movie-grid";
+import { MovieGrid, type GridItem } from "@/components/movie-grid";
 import { FilterBar } from "@/components/filter-bar";
 import { EMPTY_FILTERS, type MovieFilters } from "@/lib/filters";
 import { FeedbackDialog } from "@/components/feedback-dialog";
@@ -54,7 +54,7 @@ function Home() {
   const [heading, setHeading] = useState("Best matches");
   const [dismissed, setDismissed] = useState<number[]>([]);
   const [refilter, setRefilter] = useState(0);
-  const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
+  const [feed, setFeed] = useState<GridItem[]>([]);
   const [lastQuery, setLastQuery] = useState("");
   const [lastEntity, setLastEntity] = useState<Option | null>(null);
   const recommend = useServerFn(getRecommendations);
@@ -87,7 +87,7 @@ function Home() {
       setLastQuery(input.q);
       setLastEntity(input.entity ?? null);
       setLastEntity(input.entity ?? null);
-      setFeed(res.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
+      setFeed(res.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons, breakdown: i.breakdown })));
       setHeading(res.exactTitle ? `Results for “${res.exactTitle}”` : res.intentSummary ? `Because you asked for ${res.intentSummary}` : "Best matches");
     },
     onError: () => toast.error("Recommendation failed. Try again."),
@@ -125,7 +125,7 @@ function Home() {
         const seen = new Set(current.map((i) => i.movieId));
         const additions = res.items
           .filter((i) => !seen.has(i.movieId))
-          .map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons }));
+          .map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons, breakdown: i.breakdown }));
         if (!additions.length) toast.message("No more matches for that search.");
         return [...current, ...additions];
       });
@@ -194,7 +194,7 @@ function Home() {
           setFeed((current) => {
             if (current.some((i) => i.movieId === pick.movieId)) return current;
             const next = [...current];
-            next.splice(Math.max(0, index), 0, { movieId: pick.movieId, fit: pick.fit, reasons: pick.reasons });
+            next.splice(Math.max(0, index), 0, { movieId: pick.movieId, fit: pick.fit, reasons: pick.reasons, breakdown: pick.breakdown });
             return next;
           });
         },

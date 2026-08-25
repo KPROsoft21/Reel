@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
+import { AlgorithmInfo } from "@/components/algorithm-info";
 import { CollapsibleSection } from "@/components/collapsible-section";
+
 import { KnowledgeBase } from "@/components/knowledge-base";
 import { RequireAuth } from "@/components/require-auth";
 
@@ -191,6 +193,15 @@ function Profile() {
           </div>
         )}
       </CollapsibleSection>
+
+      <div className="mb-10 mt-6">
+        <CollapsibleSection
+          title="Info"
+          description="A deep dive into every number behind your recommendations — the traits, weights, biases and evidence the engine uses."
+        >
+          <AlgorithmInfo />
+        </CollapsibleSection>
+      </div>
 
 
       <div className="mb-10">
