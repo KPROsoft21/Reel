@@ -6,7 +6,7 @@ import { Check, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
 
 import { RequireAuth } from "@/components/require-auth";
 import { MoviePoster } from "@/components/movie-poster";
-import { MovieGrid } from "@/components/movie-grid";
+import { MovieGrid, type GridItem } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { MOVIES, MOVIES_BY_ID } from "@/data/catalog";
 import { getRecommendations, getMovieDetails } from "@/lib/app.functions";
@@ -123,7 +123,7 @@ function MovieDetail() {
     staleTime: 60_000,
   });
 
-  const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
+  const [feed, setFeed] = useState<GridItem[]>([]);
   const [dismissed, setDismissed] = useState<number[]>([]);
 
   useEffect(() => {
@@ -134,7 +134,7 @@ function MovieDetail() {
   useEffect(() => {
     registerMovies(similarQuery.data?.extras);
     if (similarQuery.data?.items.length) {
-      setFeed(similarQuery.data.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
+      setFeed(similarQuery.data.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons, breakdown: i.breakdown })));
     }
   }, [similarQuery.data]);
 
@@ -170,7 +170,7 @@ function MovieDetail() {
           setFeed((current) => {
             if (current.some((i) => i.movieId === pick.movieId)) return current;
             const next = [...current];
-            next.splice(Math.max(0, index), 0, { movieId: pick.movieId, fit: pick.fit, reasons: pick.reasons });
+            next.splice(Math.max(0, index), 0, { movieId: pick.movieId, fit: pick.fit, reasons: pick.reasons, breakdown: pick.breakdown });
             return next;
           });
         },
