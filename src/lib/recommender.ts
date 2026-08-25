@@ -105,6 +105,8 @@ const CORE_FEATURE_LABELS: Record<string, string> = {
   optimism: "Warm and hopeful",
 };
 
+export const FEATURE_LABELS: Record<string, string> = { ...CORE_FEATURE_LABELS, ...EXTENDED_FEATURE_LABELS };
+
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
 /** Preference match: Σ(importance × preference × centered feature) / Σ|importance| → 0..1 */
@@ -475,7 +477,7 @@ export function applyEvidence(
   const byKey = new Map(current.map((p) => [p.feature_key, p]));
   const out: PrefDelta[] = [];
 
-  for (const key of FEATURE_KEYS) {
+  for (const key of ALL_FEATURE_KEYS) {
     const f = movie.features[key];
     if (f === undefined) continue;
     const signal = (f - 0.5) * 2; // -1..1, how much the movie expresses this feature
