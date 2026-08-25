@@ -537,7 +537,7 @@ export function rankMovies({
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return diversify(scored, limit);
+  return forced ? scored : diversify(scored, limit);
 }
 
 
