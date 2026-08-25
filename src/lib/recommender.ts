@@ -446,10 +446,11 @@ export function rankMovies({
 
 
     const ctx = intentMatch(movie, intent);
-    if (ctx.hardFail) continue;
+    if (ctx.hardFail && !forced) continue;
 
     const kb = knowledgeMatch(movie, knowledge);
-    if (kb.hardFail) continue;
+    if (kb.hardFail && !forced) continue;
+
 
     const preference = preferenceMatch(movie, prefs);
     const semantic = semanticSimilarity(movie, likedMovies);
