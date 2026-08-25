@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { KnowledgeBase } from "@/components/knowledge-base";
 import { RequireAuth } from "@/components/require-auth";
 
