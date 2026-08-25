@@ -2,7 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
+import { KnowledgeBase } from "@/components/knowledge-base";
 import { RequireAuth } from "@/components/require-auth";
+
 import { useProfileUpdate, useSnapshot, useTagCorrection } from "@/hooks/use-app-data";
 
 export const Route = createFileRoute("/profile")({
