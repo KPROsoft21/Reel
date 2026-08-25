@@ -6,6 +6,8 @@ import { KnowledgeBase } from "@/components/knowledge-base";
 import { RequireAuth } from "@/components/require-auth";
 
 import { useProfileUpdate, useSnapshot, useTagCorrection } from "@/hooks/use-app-data";
+import { FEATURE_LABELS } from "@/lib/recommender";
+
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
