@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { useSnapshot } from "@/hooks/use-app-data";
 import { cn } from "@/lib/utils";
+import reelLogo from "@/assets/reel-logo.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Home" },
