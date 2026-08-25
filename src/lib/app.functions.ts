@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
 import { searchTitles, titleMatchScore } from "./title-search";
-import { tmdbEntitySearch, tmdbMovie, tmdbSearch } from "./tmdb.server";
+import { tmdbEntitySearch, tmdbMovie, tmdbSearch, type EntityResult } from "./tmdb.server";
 
 import {
   ALGORITHM_VERSION,
@@ -115,7 +115,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
         .slice(0, titleHits.length ? 2 : 4);
       titleHits = [...titleHits, ...extraHits];
     }
-    let entity: Awaited<ReturnType<typeof tmdbEntitySearch>> = null;
+    let entity: EntityResult | null = null;
     if (!anchor && !titleHits.length && q.length >= 3) {
       entity = await tmdbEntitySearch(q, 6);
       if (entity) titleHits = entity.movies.filter((m) => !data.excludeIds.includes(m.id));
