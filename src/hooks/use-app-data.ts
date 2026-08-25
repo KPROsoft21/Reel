@@ -10,6 +10,7 @@ export type MovieAction =
   | "like"
   | "dislike"
   | "clear_rating"
+  | "not_interested"
   | "watched"
   | "unwatched"
   | "add_list"
