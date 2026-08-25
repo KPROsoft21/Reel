@@ -86,6 +86,13 @@ export const getRecommendations = createServerFn({ method: "POST" })
     let intent: Intent = { positive: {}, negative: {}, summary: "" };
     let notice: string | undefined;
     const anchor = data.similarToMovieId ? MOVIES_BY_ID.get(data.similarToMovieId) : undefined;
+
+    // A typed title is a direct lookup: show the film itself, then films like it.
+    const titleHits = anchor || !data.query.trim()
+      ? []
+      : searchTitles(data.query.trim()).filter((m) => !data.excludeIds.includes(m.id));
+    const topHit = titleHits[0];
+
     if (anchor) {
       intent = {
         positive: {},
@@ -94,13 +101,43 @@ export const getRecommendations = createServerFn({ method: "POST" })
         genres_include: anchor.genres.slice(0, 2),
         summary: `something like ${anchor.title}`,
       };
+    } else if (topHit) {
+      intent = {
+        positive: {},
+        negative: {},
+        similar_to: [topHit.title],
+        genres_include: topHit.genres.slice(0, 2),
+        summary: `${topHit.title} and films like it`,
+        exact_title: topHit.title,
+      };
     } else if (data.query.trim()) {
       const parsed = await interpretIntent(data.query.trim());
       intent = parsed.intent;
       notice = parsed.notice;
     }
 
-    const ranked = rankMovies({ intent, prefs, interactions, knowledge, excludeIds: anchor ? [...data.excludeIds, anchor.id] : data.excludeIds, limit: data.limit, seed: data.seed });
+    const hitIds = titleHits.map((m) => m.id);
+    const fillLimit = Math.max(1, data.limit - hitIds.length);
+    const filler = rankMovies({
+      intent,
+      prefs,
+      interactions,
+      knowledge,
+      excludeIds: [...data.excludeIds, ...hitIds, ...(anchor ? [anchor.id] : [])],
+      limit: fillLimit,
+      seed: data.seed,
+    });
+
+    const hitScored = titleHits.map((movie) => ({
+      movie,
+      score: 2,
+      components: { preference: 0, semantic: 1, theme: 0, novelty: 0, discovery: 0, context: 1, popularity: movie.popularity },
+      reasons: ["Matches the title you searched"],
+      fit: 100,
+    }));
+
+    const ranked = [...hitScored, ...filler].slice(0, data.limit);
+
 
 
     let searchId: number | null = null;
