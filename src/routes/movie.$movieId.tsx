@@ -9,16 +9,21 @@ import { MoviePoster } from "@/components/movie-poster";
 import { MovieGrid } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { MOVIES, MOVIES_BY_ID } from "@/data/catalog";
-import { getRecommendations } from "@/lib/app.functions";
+import { getRecommendations, getMovieDetails } from "@/lib/app.functions";
+import { registerMovies } from "@/lib/movie-registry";
 import { FEATURE_LABELS, semanticSimilarity } from "@/lib/recommender";
 import { useMovieAction, useSnapshot } from "@/hooks/use-app-data";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/movie/$movieId")({
-  loader: ({ params }) => {
-    const movie = MOVIES_BY_ID.get(Number(params.movieId));
-    if (!movie) throw notFound();
-    return { movie };
+  loader: async ({ params }) => {
+    const id = Number(params.movieId);
+    const local = MOVIES_BY_ID.get(id);
+    if (local) return { movie: local };
+    const res = await getMovieDetails({ data: { movieId: id } });
+    if (!res.movie) throw notFound();
+    registerMovies([res.movie]);
+    return { movie: res.movie };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {
@@ -82,6 +87,10 @@ function MovieDetail() {
     queryFn: () => recommend({ data: { query: "", excludeIds: [], seed: 0, limit: 6, similarToMovieId: movie.id } }),
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    registerMovies(similarQuery.data?.extras);
+  }, [similarQuery.data]);
 
   const similar = similarQuery.data?.items.length
     ? similarQuery.data.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons }))
