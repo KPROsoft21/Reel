@@ -1,4 +1,5 @@
-import { FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
+import { ALL_FEATURE_KEYS, MOVIES, type Movie } from "@/data/catalog";
+import { EXTENDED_FEATURE_LABELS } from "@/lib/extended-features";
 
 export const ALGORITHM_VERSION = "v1";
 
@@ -86,7 +87,7 @@ export type ScoredMovie = {
   fit: number;
 };
 
-export const FEATURE_LABELS: Record<string, string> = {
+const CORE_FEATURE_LABELS: Record<string, string> = {
   character_driven: "Character-driven",
   atmosphere: "Atmospheric",
   philosophical: "Philosophical",
@@ -103,6 +104,8 @@ export const FEATURE_LABELS: Record<string, string> = {
   dark_tone: "Dark in tone",
   optimism: "Warm and hopeful",
 };
+
+export const FEATURE_LABELS: Record<string, string> = { ...CORE_FEATURE_LABELS, ...EXTENDED_FEATURE_LABELS };
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 
@@ -138,7 +141,7 @@ function cosine(a: number[], b: number[]) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-const vec = (m: Movie) => FEATURE_KEYS.map((k) => m.features[k] ?? 0);
+const vec = (m: Movie) => ALL_FEATURE_KEYS.map((k) => m.features[k] ?? 0);
 
 /** Semantic similarity against liked movies (content-based retrieval signal). */
 export function semanticSimilarity(movie: Movie, likedMovies: Movie[]): number {
@@ -474,11 +477,15 @@ export function applyEvidence(
   const byKey = new Map(current.map((p) => [p.feature_key, p]));
   const out: PrefDelta[] = [];
 
-  for (const key of FEATURE_KEYS) {
-    const f = movie.features[key];
-    if (f === undefined) continue;
+  // With 120+ metrics per film, only the most expressive ones carry usable
+  // signal — learning from everything would blur the model and bloat writes.
+  const candidates = ALL_FEATURE_KEYS.map((key) => ({ key, f: movie.features[key] }))
+    .filter((c): c is { key: string; f: number } => c.f !== undefined && Math.abs(c.f - 0.5) * 2 >= 0.3)
+    .sort((a, b) => Math.abs(b.f - 0.5) - Math.abs(a.f - 0.5))
+    .slice(0, 30);
+
+  for (const { key, f } of candidates) {
     const signal = (f - 0.5) * 2; // -1..1, how much the movie expresses this feature
-    if (Math.abs(signal) < 0.3) continue; // uninformative
     const prev = byKey.get(key);
     const prevValue = prev?.preference_value ?? 0;
     const prevConf = prev?.confidence ?? 0;

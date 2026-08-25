@@ -1,5 +1,7 @@
 // AUTO-GENERATED from TMDB. Do not hand-edit; regenerate with the import script.
 // Feature values are normalized 0..1 semantic attributes used by the recommender.
+import { deriveExtendedFeatures, EXTENDED_FEATURE_KEYS } from "@/lib/extended-features";
+
 export const FEATURE_KEYS = ["character_driven","atmosphere","philosophical","humor","tension","romance","visual_style","slow_burn","complexity","emotional_intensity","realism","violence","world_building","dark_tone","optimism"] as const;
 
 export type Movie = {
@@ -1021,19 +1023,13 @@ const RAW: Row[] = [
 [626332,"Flamin' Hot",2023,99,"Eva Longoria",["Drama","History"],"The inspiring true story of Richard Montañez, the Frito Lay janitor who channeled his Mexican American heritage and upbringing to turn the iconic Flamin' Hot Cheetos into a snack that disrupted the food industry and became a global pop culture phenomenon.",[0.89,0.35,0.35,0.21,0.46,0.37,0.47,0.48,0.38,0.8,0.82,0.31,0.32,0.32,0.33],0.59,7.94,"https://image.tmdb.org/t/p/w500/a7KyFMPXj0iY4EoLq1PIGU1WJPw.jpg"],
 ];
 
-export const MOVIES: Movie[] = RAW.map(([id, title, year, runtime, director, genres, overview, feats, popularity, rating, poster]) => ({
-  id,
-  title,
-  year,
-  runtime,
-  director,
-  genres,
-  overview,
-  features: Object.fromEntries(FEATURE_KEYS.map((k, j) => [k, feats[j] ?? 0.35])) as Record<string, number>,
-  popularity,
-  rating,
-  poster,
-}));
+export const MOVIES: Movie[] = RAW.map(([id, title, year, runtime, director, genres, overview, feats, popularity, rating, poster]) => {
+  const features = Object.fromEntries(FEATURE_KEYS.map((k, j) => [k, feats[j] ?? 0.35])) as Record<string, number>;
+  const movie: Movie = { id, title, year, runtime, director, genres, overview, features, popularity, rating, poster };
+  movie.features = { ...features, ...deriveExtendedFeatures({ ...movie }) };
+  return movie;
+});
 
 export const MOVIES_BY_ID = new Map<number, Movie>(MOVIES.map((m) => [m.id, m]));
 export const ALL_GENRES = [...new Set(MOVIES.flatMap((m) => m.genres))].sort();
+export const ALL_FEATURE_KEYS: string[] = [...FEATURE_KEYS, ...EXTENDED_FEATURE_KEYS];
