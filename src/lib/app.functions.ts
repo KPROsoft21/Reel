@@ -47,7 +47,19 @@ export const getSnapshot = createServerFn({ method: "GET" })
     ]);
 
     const preferences = asPrefs(prefs.data ?? []);
+    // Films saved from live TMDB aren't in the bundled catalog: ship them along.
+    const referenced = new Set<number>([
+      ...(interactions.data ?? []).map((i) => Number(i.movie_id)),
+      ...(watchlist.data ?? []).map((w) => Number(w.movie_id)),
+    ]);
+    const extras = (
+      await Promise.all(
+        [...referenced].filter((id) => !MOVIES_BY_ID.has(id)).slice(0, 40).map((id) => tmdbMovie(id)),
+      )
+    ).filter((m): m is NonNullable<typeof m> => !!m);
+
     return {
+      extras,
       profile: profile.data ?? { user_id: userId, display_name: null, bio: null, avatar_url: null },
       interactions: asInteractions(interactions.data ?? []),
       watchlist: (watchlist.data ?? []).map((w) => ({
