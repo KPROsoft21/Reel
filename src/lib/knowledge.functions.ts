@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { extractKnowledge } from "./knowledge.server";
-import { EMPTY_SIGNALS, type KnowledgeSignals } from "./recommender";
+import { toSignals, type KnowledgeSignals } from "./recommender";
 
 export type KnowledgeEntry = {
   id: string;
@@ -13,11 +13,6 @@ export type KnowledgeEntry = {
   active: boolean;
   created_at: string;
 };
-
-export const toSignals = (value: unknown): KnowledgeSignals => ({
-  ...EMPTY_SIGNALS,
-  ...((value as Partial<KnowledgeSignals> | null) ?? {}),
-});
 
 export const listKnowledge = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

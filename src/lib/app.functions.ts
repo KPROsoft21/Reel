@@ -4,13 +4,13 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
-import { toSignals } from "./knowledge.functions";
 
 import {
   ALGORITHM_VERSION,
   applyEvidence,
   rankMovies,
   tasteTags,
+  toSignals,
   type Intent,
   type Preference,
   type InteractionState,

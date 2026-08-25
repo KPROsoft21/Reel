@@ -252,6 +252,12 @@ export function knowledgeMatch(
   return { score: clamp01(score), hardFail, reasons: [...new Set(reasons)].slice(0, 2) };
 }
 
+/** Normalize a stored jsonb signal blob into a full rule. */
+export const toSignals = (value: unknown): KnowledgeSignals => ({
+  ...EMPTY_SIGNALS,
+  ...((value as Partial<KnowledgeSignals> | null) ?? {}),
+});
+
 export type RankInput = {
   intent: Intent;
   prefs: Preference[];
