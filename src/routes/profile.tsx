@@ -7,6 +7,8 @@ import { RequireAuth } from "@/components/require-auth";
 
 import { useProfileUpdate, useSnapshot, useTagCorrection } from "@/hooks/use-app-data";
 import { FEATURE_LABELS } from "@/lib/recommender";
+import { useTasteSummary } from "@/hooks/use-taste-summary";
+
 
 
 export const Route = createFileRoute("/profile")({
@@ -31,6 +33,8 @@ function Profile() {
   const { data } = useSnapshot();
   const update = useProfileUpdate();
   const correct = useTagCorrection();
+  const summary = useTasteSummary();
+
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
 
@@ -112,7 +116,50 @@ function Profile() {
       </div>
 
       <section className="mb-10">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-display text-2xl">How the algorithm reads you</h2>
+          <button
+            onClick={() => summary.refetch()}
+            disabled={summary.isFetching}
+            className="chamfer-sm hairline px-3 py-1.5 text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {summary.isFetching ? "Thinking…" : "Refresh"}
+          </button>
+        </div>
+        <div className="chamfer hairline mt-4 bg-surface p-6">
+          {summary.isLoading ? (
+            <p className="text-sm text-muted-foreground">Reading your taste model…</p>
+          ) : summary.data ? (
+            <>
+              <p className="font-display text-xl text-primary">{summary.data.headline}</p>
+              <p className="mt-3 text-sm leading-relaxed text-foreground/90">{summary.data.summary}</p>
+              {summary.data.reasons.length > 0 && (
+                <div className="mt-5 space-y-3">
+                  <p className="text-[0.6rem] uppercase tracking-[0.25em] text-muted-foreground">Why it thinks so</p>
+                  {summary.data.reasons.map((r) => (
+                    <div key={r.title} className="chamfer-sm hairline bg-background p-3">
+                      <p className="text-sm font-medium text-foreground">{r.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{r.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {summary.data.blindspot && (
+                <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+                  <span className="uppercase tracking-[0.2em]">Still unsure — </span>
+                  {summary.data.blindspot}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Couldn't generate a summary right now.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="mb-10">
         <h2 className="font-display text-2xl">What we've learned</h2>
+
         <p className="mt-1 text-sm text-muted-foreground">
           Live from your taste model — {prefs.length} feature{prefs.length === 1 ? "" : "s"} learned from {evidence}{" "}
           signal{evidence === 1 ? "" : "s"}. Remove anything that doesn't sound like you; the recommender adjusts
