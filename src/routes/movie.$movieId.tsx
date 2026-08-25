@@ -88,13 +88,60 @@ function MovieDetail() {
     staleTime: 60_000,
   });
 
+  const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
+  const [dismissed, setDismissed] = useState<number[]>([]);
+
+  useEffect(() => {
+    setFeed([]);
+    setDismissed([]);
+  }, [movie.id]);
+
   useEffect(() => {
     registerMovies(similarQuery.data?.extras);
+    if (similarQuery.data?.items.length) {
+      setFeed(similarQuery.data.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
+    }
   }, [similarQuery.data]);
 
-  const similar = similarQuery.data?.items.length
-    ? similarQuery.data.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons }))
-    : fallbackSimilar;
+  const replace = useMutation({
+    mutationFn: (input: { exclude: number[] }) =>
+      recommend({
+        data: {
+          query: "",
+          excludeIds: input.exclude,
+          seed: Math.floor(Math.random() * 100000),
+          limit: 1,
+          similarToMovieId: movie.id,
+        },
+      }),
+  });
+
+  const similar = feed.length ? feed : fallbackSimilar.filter((i) => !dismissed.includes(i.movieId));
+
+  // Acting on (or dismissing) a pick frees the slot — refill it with another similar film.
+  const onRemove = (id: number) => {
+    const nextDismissed = dismissed.includes(id) ? dismissed : [...dismissed, id];
+    setDismissed(nextDismissed);
+    const index = similar.findIndex((i) => i.movieId === id);
+    const remaining = similar.filter((i) => i.movieId !== id);
+    setFeed(remaining);
+    replace.mutate(
+      { exclude: [...nextDismissed, movie.id, ...remaining.map((i) => i.movieId)] },
+      {
+        onSuccess: (res) => {
+          registerMovies(res.extras);
+          const pick = res.items[0];
+          if (!pick) return;
+          setFeed((current) => {
+            if (current.some((i) => i.movieId === pick.movieId)) return current;
+            const next = [...current];
+            next.splice(Math.max(0, index), 0, { movieId: pick.movieId, fit: pick.fit, reasons: pick.reasons });
+            return next;
+          });
+        },
+      },
+    );
+  };
 
   return (
     <article>
