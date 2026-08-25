@@ -212,7 +212,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
       if (picked) titleHits = [picked];
     } else if (entity) {
       const entityMovies = await tmdbEntityMovies(entity.kind, entity.id, 8);
-      titleHits = entityMovies.filter((m) => !data.excludeIds.includes(m.id)).slice(0, 6);
+      titleHits = entityMovies.filter((m) => !data.excludeIds.includes(m.id) && !engagedIds.has(m.id)).slice(0, 6);
+
     }
     titleHits = titleHits.filter((m) => matchesFilters(m, filters));
     const topHit = titleHits[0];
