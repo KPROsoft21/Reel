@@ -4,7 +4,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
-import { searchTitles } from "./title-search";
+import { searchTitles, titleMatchScore } from "./title-search";
+import { tmdbMovie, tmdbSearch } from "./tmdb.server";
 
 import {
   ALGORITHM_VERSION,
@@ -46,7 +47,19 @@ export const getSnapshot = createServerFn({ method: "GET" })
     ]);
 
     const preferences = asPrefs(prefs.data ?? []);
+    // Films saved from live TMDB aren't in the bundled catalog: ship them along.
+    const referenced = new Set<number>([
+      ...(interactions.data ?? []).map((i) => Number(i.movie_id)),
+      ...(watchlist.data ?? []).map((w) => Number(w.movie_id)),
+    ]);
+    const extras = (
+      await Promise.all(
+        [...referenced].filter((id) => !MOVIES_BY_ID.has(id)).slice(0, 40).map((id) => tmdbMovie(id)),
+      )
+    ).filter((m): m is NonNullable<typeof m> => !!m);
+
     return {
+      extras,
       profile: profile.data ?? { user_id: userId, display_name: null, bio: null, avatar_url: null },
       interactions: asInteractions(interactions.data ?? []),
       watchlist: (watchlist.data ?? []).map((w) => ({
@@ -86,12 +99,22 @@ export const getRecommendations = createServerFn({ method: "POST" })
 
     let intent: Intent = { positive: {}, negative: {}, summary: "" };
     let notice: string | undefined;
-    const anchor = data.similarToMovieId ? MOVIES_BY_ID.get(data.similarToMovieId) : undefined;
+    const anchor = data.similarToMovieId
+      ? MOVIES_BY_ID.get(data.similarToMovieId) ?? (await tmdbMovie(data.similarToMovieId)) ?? undefined
+      : undefined;
 
     // A typed title is a direct lookup: show the film itself, then films like it.
-    const titleHits = anchor || !data.query.trim()
-      ? []
-      : searchTitles(data.query.trim()).filter((m) => !data.excludeIds.includes(m.id));
+    // Local catalog first, then all of TMDB so every film is reachable.
+    const q = data.query.trim();
+    let titleHits = anchor || !q ? [] : searchTitles(q).filter((m) => !data.excludeIds.includes(m.id));
+    if (!anchor && q.length >= 2) {
+      const remote = await tmdbSearch(q, 6);
+      const known = new Set([...titleHits.map((m) => m.id), ...data.excludeIds]);
+      const extraHits = remote
+        .filter((m) => !known.has(m.id) && titleMatchScore(q, m.title) >= 0.6)
+        .slice(0, titleHits.length ? 2 : 4);
+      titleHits = [...titleHits, ...extraHits];
+    }
     const topHit = titleHits[0];
 
     if (anchor) {
@@ -111,8 +134,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
         summary: `${topHit.title} and films like it`,
         exact_title: topHit.title,
       };
-    } else if (data.query.trim()) {
-      const parsed = await interpretIntent(data.query.trim());
+    } else if (q) {
+      const parsed = await interpretIntent(q);
       intent = parsed.intent;
       notice = parsed.notice;
     }
@@ -138,6 +161,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
     }));
 
     const ranked = [...hitScored, ...filler].slice(0, data.limit);
+    const extras = ranked.map((r) => r.movie).filter((m) => !MOVIES_BY_ID.has(m.id));
 
 
 
@@ -185,6 +209,7 @@ export const getRecommendations = createServerFn({ method: "POST" })
         reasons: r.reasons,
         components: r.components,
       })),
+      extras,
     };
   });
 
@@ -195,7 +220,7 @@ async function learnFrom(
   direction: number,
   evidenceType: Parameters<typeof applyEvidence>[3],
 ) {
-  const movie = MOVIES_BY_ID.get(movieId);
+  const movie = MOVIES_BY_ID.get(movieId) ?? (await tmdbMovie(movieId));
   if (!movie) return;
   const { data } = await supabase.from("user_preferences").select("*").eq("user_id", userId);
   const deltas = applyEvidence(asPrefs(data ?? []), movie, direction, evidenceType);
@@ -313,7 +338,7 @@ export const submitFeedback = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const movie = data.movieId ? MOVIES_BY_ID.get(data.movieId) : null;
+  const movie = data.movieId ? MOVIES_BY_ID.get(data.movieId) ?? (await tmdbMovie(data.movieId)) : null;
 
     // Structured chips map straight onto feature adjustments.
     const REASON_MAP: Record<string, [string, number]> = {
@@ -440,4 +465,14 @@ export const updateProfile = createServerFn({ method: "POST" })
       { onConflict: "user_id" },
     );
     return { ok: true };
+  });
+
+/** Resolve any TMDB film id, whether or not it is in the bundled catalog. */
+export const getMovieDetails = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ movieId: z.number() }).parse(data))
+  .handler(async ({ data }) => {
+    const local = MOVIES_BY_ID.get(data.movieId);
+    if (local) return { movie: local };
+    const remote = await tmdbMovie(data.movieId);
+    return { movie: remote };
   });

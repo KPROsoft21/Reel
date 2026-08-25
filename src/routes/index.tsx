@@ -8,6 +8,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { MovieGrid } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { getRecommendations } from "@/lib/app.functions";
+import { registerMovies } from "@/lib/movie-registry";
 import { useSnapshot } from "@/hooks/use-app-data";
 import { toast } from "sonner";
 
@@ -63,6 +64,7 @@ function Home() {
     mutationFn: (input: { q: string; seed: number }) =>
       recommend({ data: { query: input.q, excludeIds: dismissed, seed: input.seed, limit: 9 } }),
     onSuccess: (res, input) => {
+      registerMovies(res.extras);
       if (res.notice) toast.message(res.notice);
       setLastQuery(input.q);
       setFeed(res.items.map((i) => ({ movieId: i.movieId, fit: i.fit, reasons: i.reasons })));
@@ -95,6 +97,7 @@ function Home() {
       { exclude: [...nextDismissed, ...remaining.map((i) => i.movieId)] },
       {
         onSuccess: (res) => {
+          registerMovies(res.extras);
           const pick = res.items[0];
           if (!pick) return;
           setFeed((current) => {

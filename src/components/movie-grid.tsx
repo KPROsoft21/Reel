@@ -1,4 +1,4 @@
-import { MOVIES_BY_ID } from "@/data/catalog";
+import { getMovie } from "@/lib/movie-registry";
 import { MovieCard } from "./movie-card";
 import { useSnapshot } from "@/hooks/use-app-data";
 
@@ -25,7 +25,7 @@ export function MovieGrid({
   return (
     <div className="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-3">
       {items.map((item) => {
-        const movie = MOVIES_BY_ID.get(item.movieId);
+        const movie = getMovie(item.movieId);
         if (!movie) return null;
         const state = interactions.get(item.movieId);
         return (
