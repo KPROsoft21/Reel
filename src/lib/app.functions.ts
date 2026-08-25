@@ -380,6 +380,8 @@ export const getRecommendations = createServerFn({ method: "POST" })
         fit: r.fit,
         reasons: r.reasons,
         components: r.components,
+        breakdown: r.breakdown,
+
       })),
       extras,
     };
