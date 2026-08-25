@@ -72,6 +72,36 @@ export function notInterestedPenalty(state: InteractionState | undefined): numbe
   return 0.9 * freshness * Math.min(2, state.not_interested_count ?? 1);
 }
 
+/** One weighted signal that fed the final score. */
+export type ScoreLine = {
+  key: string;
+  label: string;
+  /** The raw 0..1 signal strength. */
+  value: number;
+  /** How much this signal was allowed to matter in this context. */
+  weight: number;
+  /** value × weight — the points it actually added. */
+  contribution: number;
+  hint: string;
+};
+
+/** Everything needed to show, honestly, how the fit % came about. */
+export type ScoreBreakdown = {
+  lines: ScoreLine[];
+  /** Bonuses and penalties applied after the weighted blend. */
+  adjustments: { label: string; value: number; hint: string }[];
+  /** Sum of the weighted signals, before adjustments. */
+  weighted: number;
+  /** Maximum points the weighted signals could have scored. */
+  budget: number;
+  /** Final blended score. */
+  total: number;
+  /** Normalised 0..1 read of the score, the input to the fit %. */
+  quality: number;
+  fit: number;
+  mode: "search" | "feed" | "direct";
+};
+
 export type ScoredMovie = {
   movie: Movie;
   score: number;
@@ -86,7 +116,9 @@ export type ScoredMovie = {
   };
   reasons: string[];
   fit: number;
+  breakdown: ScoreBreakdown;
 };
+
 
 const CORE_FEATURE_LABELS: Record<string, string> = {
   character_driven: "Character-driven",
