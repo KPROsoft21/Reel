@@ -7,7 +7,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import { RequireAuth } from "@/components/require-auth";
 import { MovieGrid } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
-import { getRecommendations } from "@/lib/app.functions";
+import { getRecommendations, getSearchOptions } from "@/lib/app.functions";
 import { registerMovies } from "@/lib/movie-registry";
 import { useSnapshot } from "@/hooks/use-app-data";
 import { toast } from "sonner";
@@ -53,6 +53,10 @@ function Home() {
   const [feed, setFeed] = useState<{ movieId: number; fit?: number; reasons?: string[] }[]>([]);
   const [lastQuery, setLastQuery] = useState("");
   const recommend = useServerFn(getRecommendations);
+  const searchOptions = useServerFn(getSearchOptions);
+  type Option = { kind: "actor" | "director" | "franchise" | "studio" | "keyword" | "title"; id: string; label: string; subtitle: string };
+  const [options, setOptions] = useState<Option[] | null>(null);
+  const [pendingQuery, setPendingQuery] = useState("");
   const { data: snapshot } = useSnapshot();
 
   useEffect(() => {
@@ -61,8 +65,16 @@ function Home() {
   }, []);
 
   const mutation = useMutation({
-    mutationFn: (input: { q: string; seed: number }) =>
-      recommend({ data: { query: input.q, excludeIds: dismissed, seed: input.seed, limit: 9 } }),
+    mutationFn: (input: { q: string; seed: number; entity?: Option | null }) =>
+      recommend({
+        data: {
+          query: input.q,
+          excludeIds: dismissed,
+          seed: input.seed,
+          limit: 9,
+          entity: input.entity ? { kind: input.entity.kind, id: input.entity.id, label: input.entity.label } : null,
+        },
+      }),
     onSuccess: (res, input) => {
       registerMovies(res.extras);
       if (res.notice) toast.message(res.notice);
@@ -80,7 +92,36 @@ function Home() {
       }),
   });
 
-  const run = (q: string) => mutation.mutate({ q, seed: Math.floor(Math.random() * 100000) });
+  const run = (q: string, entity?: Option | null) =>
+    mutation.mutate({ q, entity: entity ?? null, seed: Math.floor(Math.random() * 100000) });
+
+  // Ambiguous queries ("marvel") get confirmed by the viewer instead of guessed.
+  const disambiguate = useMutation({
+    mutationFn: (q: string) => searchOptions({ data: { query: q } }),
+    onSuccess: (res, q) => {
+      const all = [...res.titles, ...res.candidates] as Option[];
+      if (all.length <= 1) {
+        run(q, all[0] ?? null);
+        setOptions(null);
+        return;
+      }
+      setPendingQuery(q);
+      setOptions(all);
+    },
+    onError: (_e, q) => run(q),
+  });
+
+  const submit = (q: string) => {
+    const trimmed = q.trim();
+    setOptions(null);
+    if (!trimmed) return run("");
+    disambiguate.mutate(trimmed);
+  };
+
+  const choose = (option: Option | null) => {
+    setOptions(null);
+    run(pendingQuery, option);
+  };
 
   useEffect(() => {
     run("");
@@ -131,7 +172,7 @@ function Home() {
           className="mx-auto mt-8 flex max-w-2xl items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            run(query);
+            submit(query);
           }}
         >
           <input
@@ -143,7 +184,7 @@ function Home() {
           />
           <button
             type="submit"
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || disambiguate.isPending}
             aria-label="Get recommendations"
             className="chamfer flex h-14 w-14 shrink-0 items-center justify-center bg-primary text-primary-foreground transition-opacity disabled:opacity-60"
           >
@@ -151,6 +192,34 @@ function Home() {
           </button>
         </form>
       </section>
+
+
+      {options && (
+        <div className="chamfer hairline mb-10 bg-surface p-5">
+          <p className="text-sm font-medium">Which “{pendingQuery}” did you mean?</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {options.map((o) => (
+              <button
+                key={`${o.kind}-${o.id}`}
+                type="button"
+                onClick={() => choose(o)}
+                className="chamfer hairline bg-background px-4 py-2 text-left transition-colors hover:border-primary"
+              >
+                <span className="block text-sm">{o.label}</span>
+                <span className="block text-xs text-muted-foreground">{o.subtitle}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => choose(null)}
+              className="chamfer hairline bg-background px-4 py-2 text-left transition-colors hover:border-primary"
+            >
+              <span className="block text-sm">None of these</span>
+              <span className="block text-xs text-muted-foreground">Treat it as a mood</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {observation && (
         <div className="chamfer hairline mb-10 flex gap-3 bg-surface p-5">
@@ -163,11 +232,11 @@ function Home() {
       )}
 
       <div className="mb-6 flex items-baseline justify-between gap-4">
-        <h2 className="font-display text-2xl">{mutation.isPending ? "Thinking…" : heading}</h2>
+        <h2 className="font-display text-2xl">{mutation.isPending || disambiguate.isPending ? "Thinking…" : heading}</h2>
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => run(query)}
+            onClick={() => submit(query)}
             disabled={mutation.isPending}
             className="text-xs uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           >
@@ -177,7 +246,7 @@ function Home() {
         </div>
       </div>
 
-      {mutation.isPending ? (
+      {mutation.isPending || disambiguate.isPending ? (
         <div className="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3">
           {Array.from({ length: 9 }).map((_, i) => (
             <div key={i} className="chamfer aspect-[2/3] w-full animate-pulse bg-surface" />
