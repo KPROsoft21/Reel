@@ -33,6 +33,8 @@ function Profile() {
   const { data } = useSnapshot();
   const update = useProfileUpdate();
   const correct = useTagCorrection();
+  const summary = useTasteSummary();
+
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
 
