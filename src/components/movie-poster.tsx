@@ -1,5 +1,4 @@
 import type { Movie } from "@/data/catalog";
-import { usePoster } from "@/hooks/use-posters";
 import { cn } from "@/lib/utils";
 
 /**
@@ -7,7 +6,8 @@ import { cn } from "@/lib/utils";
  * composition as the fallback so the grid never shows an empty tile.
  */
 export function MoviePoster({ movie, className }: { movie: Movie; className?: string }) {
-  const art = usePoster(movie.id);
+  const art = movie.poster ? { poster: movie.poster } : undefined;
+
   const hue = (movie.id * 47) % 360;
   const dark = movie.features['dark_tone'] ?? 0.5;
   const style = {
