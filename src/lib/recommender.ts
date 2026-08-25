@@ -381,6 +381,8 @@ export function rankMovies({
   const dislikedMovies = MOVIES.filter((m) => seen.get(m.id)?.liked === false);
   const evidence = prefs.reduce((s, p) => s + p.evidence_count, 0);
   const profileMaturity = clamp01(evidence / 30);
+  const oldTaste = oldSchoolTaste(likedMovies, interactions, affinity);
+
 
   const exactTitle = intent.exact_title?.toLowerCase().trim();
   const searching = hasIntentSignal(intent);
