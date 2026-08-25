@@ -477,11 +477,15 @@ export function applyEvidence(
   const byKey = new Map(current.map((p) => [p.feature_key, p]));
   const out: PrefDelta[] = [];
 
-  for (const key of ALL_FEATURE_KEYS) {
-    const f = movie.features[key];
-    if (f === undefined) continue;
+  // With 120+ metrics per film, only the most expressive ones carry usable
+  // signal — learning from everything would blur the model and bloat writes.
+  const candidates = ALL_FEATURE_KEYS.map((key) => ({ key, f: movie.features[key] }))
+    .filter((c): c is { key: string; f: number } => c.f !== undefined && Math.abs(c.f - 0.5) * 2 >= 0.3)
+    .sort((a, b) => Math.abs(b.f - 0.5) - Math.abs(a.f - 0.5))
+    .slice(0, 30);
+
+  for (const { key, f } of candidates) {
     const signal = (f - 0.5) * 2; // -1..1, how much the movie expresses this feature
-    if (Math.abs(signal) < 0.3) continue; // uninformative
     const prev = byKey.get(key);
     const prevValue = prev?.preference_value ?? 0;
     const prevConf = prev?.confidence ?? 0;
