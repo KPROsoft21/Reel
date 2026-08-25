@@ -230,6 +230,30 @@ function MovieDetail() {
           </div>
 
           <div className="mt-8">
+            <button
+              type="button"
+              onClick={() => setShowWhy((s) => !s)}
+              aria-expanded={showWhy}
+              className="flex items-center gap-2 text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <BarChart3 className="size-3.5" />
+              Why this pick
+              {typeof whyQuery.data?.fit === "number" && <span className="text-primary">{whyQuery.data.fit}% fit</span>}
+              <ChevronDown className={cn("size-3.5 transition-transform", showWhy && "rotate-180")} />
+            </button>
+            {showWhy &&
+              (whyQuery.isPending ? (
+                <p className="mt-3 text-sm text-muted-foreground">Working out the numbers…</p>
+              ) : whyQuery.data?.breakdown ? (
+                <ScoreBreakdownPanel breakdown={whyQuery.data.breakdown} />
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">No score breakdown available for this film.</p>
+              ))}
+          </div>
+
+
+
+          <div className="mt-8">
             <FeedbackDialog trigger="Tell us what's off about this pick" movieId={movie.id} />
           </div>
         </div>
