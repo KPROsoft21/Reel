@@ -196,6 +196,24 @@ function Swipe() {
               {top?.reasons?.[0] && (
                 <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground/80">{top.reasons[0]}</p>
               )}
+              <div
+                className="mt-4 flex items-center justify-center gap-3"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SwipeButton label="Pass" onClick={pass} tone="danger">
+                  <X className="size-5" />
+                </SwipeButton>
+                <SwipeButton label="Like" onClick={like} tone="primary">
+                  <Heart className="size-5" />
+                </SwipeButton>
+                <SwipeButton label="Add to My List" onClick={save} tone="plain">
+                  <Plus className="size-5" />
+                </SwipeButton>
+                <SwipeButton label="Watched" onClick={watched} tone="plain">
+                  <Check className="size-5" />
+                </SwipeButton>
+              </div>
             </div>
           </div>
         ) : (
@@ -203,21 +221,6 @@ function Swipe() {
             {load.isPending ? "Finding your next pick…" : "No more picks right now."}
           </div>
         )}
-      </div>
-
-      <div className="mt-8 flex items-center justify-center gap-4">
-        <SwipeButton label="Pass" onClick={pass} tone="danger">
-          <X className="size-5" />
-        </SwipeButton>
-        <SwipeButton label="Like" onClick={like} tone="primary">
-          <Heart className="size-5" />
-        </SwipeButton>
-        <SwipeButton label="Add to My List" onClick={save} tone="plain">
-          <Plus className="size-5" />
-        </SwipeButton>
-        <SwipeButton label="Watched" onClick={watched} tone="plain">
-          <Check className="size-5" />
-        </SwipeButton>
       </div>
     </div>
   );
