@@ -10,6 +10,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { EMPTY_FILTERS, type MovieFilters } from "@/lib/filters";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { getRecommendations, getSearchOptions } from "@/lib/app.functions";
+import { FEATURE_LABELS } from "@/lib/recommender";
 import { registerMovies } from "@/lib/movie-registry";
 import { useSnapshot } from "@/hooks/use-app-data";
 import { toast } from "sonner";
@@ -206,13 +207,39 @@ function Home() {
 
 
 
+  // Reads straight off the live taste model: strongest learned signals, what
+  // the model actively steers away from, and how much evidence backs it.
   const observation = useMemo(() => {
-    const tags = snapshot?.tags ?? [];
-    if (tags.length < 3) return null;
-    const [a, b] = tags;
-    if (!a || !b) return null;
-    return `You seem to care more about ${a.label.toLowerCase()} and ${b.label.toLowerCase()} than genre, so we've started recommending outside your usual corners.`;
-  }, [snapshot?.tags]);
+    const prefs = snapshot?.preferences ?? [];
+    const interactions = snapshot?.interactions ?? [];
+    const signals = interactions.filter((i) => i.liked !== null || i.watched).length;
+    const scored = prefs
+      .filter((p) => p.confidence > 0.1 && Math.abs(p.preference_value) > 0.15)
+      .map((p) => ({
+        label: (FEATURE_LABELS[p.feature_key] ?? p.feature_key).toLowerCase(),
+        value: p.preference_value,
+        weight: Math.abs(p.preference_value) * p.confidence,
+        evidence: p.evidence_count,
+      }))
+      .sort((a, b) => b.weight - a.weight);
+
+    if (signals < 3 || scored.length < 2) {
+      return signals === 0
+        ? null
+        : `${signals} signal${signals === 1 ? "" : "s"} so far — like, save or skip a few more and the ranking starts leaning your way.`;
+    }
+
+    const loves = scored.filter((s) => s.value > 0).slice(0, 2);
+    const avoids = scored.filter((s) => s.value < 0).slice(0, 1);
+    if (!loves.length) {
+      return `From ${signals} signals, the strongest thing learned so far is what you steer away from: ${scored[0]!.label}.`;
+    }
+    const lovePart = loves.map((l) => l.label).join(" and ");
+    const evidence = loves.reduce((n, l) => n + l.evidence, 0);
+    const avoidPart = avoids[0] ? `, and dialling back ${avoids[0].label}` : "";
+    return `Across ${signals} rated films, ${lovePart} carr${loves.length > 1 ? "y" : "ies"} the most weight in your ranking (${evidence} supporting signals)${avoidPart}.`;
+  }, [snapshot?.preferences, snapshot?.interactions]);
+
 
   return (
     <div>
