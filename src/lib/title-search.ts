@@ -44,3 +44,21 @@ export function searchTitles(rawQuery: string, limit = 4): Movie[] {
   if (!best || best.score < 0.4) return [];
   return scored.slice(0, limit).map((s) => s.movie);
 }
+
+/** 0..1 similarity between a typed query and a candidate title. */
+export function titleMatchScore(rawQuery: string, rawTitle: string): number {
+  const q = norm(rawQuery);
+  const t = norm(rawTitle);
+  if (q.length < 3 || !t) return 0;
+  if (t === q) return 1;
+  if (t.startsWith(q) || q.startsWith(t)) return 0.9;
+  if (q.length >= 4 && t.includes(q)) return 0.8;
+  const qWords = q.split(" ").filter((w) => !STOP.has(w));
+  const tWords = t.split(" ").filter((w) => !STOP.has(w));
+  if (!qWords.length || !tWords.length) return 0;
+  const hits = qWords.filter((w) => tWords.some((tw) => tw === w || (w.length > 4 && tw.startsWith(w))));
+  const coverage = hits.length / qWords.length;
+  const titleCoverage = hits.length / tWords.length;
+  if (coverage >= 0.8 && titleCoverage >= 0.6) return 0.6 * coverage * titleCoverage;
+  return 0;
+}
