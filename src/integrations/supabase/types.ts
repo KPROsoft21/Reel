@@ -276,6 +276,8 @@ export type Database = {
           id: number
           liked: boolean | null
           movie_id: number
+          not_interested_at: string | null
+          not_interested_count: number
           rated_at: string | null
           rating: number | null
           source: string | null
@@ -289,6 +291,8 @@ export type Database = {
           id?: number
           liked?: boolean | null
           movie_id: number
+          not_interested_at?: string | null
+          not_interested_count?: number
           rated_at?: string | null
           rating?: number | null
           source?: string | null
@@ -302,6 +306,8 @@ export type Database = {
           id?: number
           liked?: boolean | null
           movie_id?: number
+          not_interested_at?: string | null
+          not_interested_count?: number
           rated_at?: string | null
           rating?: number | null
           source?: string | null
