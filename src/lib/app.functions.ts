@@ -4,7 +4,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { MOVIES_BY_ID } from "@/data/catalog";
 import { interpretIntent, extractFeedback } from "./intent.server";
-import { searchTitles } from "./title-search";
+import { searchTitles, titleMatchScore } from "./title-search";
+import { tmdbMovie, tmdbSearch } from "./tmdb.server";
 
 import {
   ALGORITHM_VERSION,
@@ -207,7 +208,7 @@ async function learnFrom(
   direction: number,
   evidenceType: Parameters<typeof applyEvidence>[3],
 ) {
-  const movie = MOVIES_BY_ID.get(movieId);
+  const movie = MOVIES_BY_ID.get(movieId) ?? (await tmdbMovie(movieId));
   if (!movie) return;
   const { data } = await supabase.from("user_preferences").select("*").eq("user_id", userId);
   const deltas = applyEvidence(asPrefs(data ?? []), movie, direction, evidenceType);
@@ -325,7 +326,7 @@ export const submitFeedback = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const movie = data.movieId ? MOVIES_BY_ID.get(data.movieId) : null;
+  const movie = data.movieId ? MOVIES_BY_ID.get(data.movieId) ?? (await tmdbMovie(data.movieId)) : null;
 
     // Structured chips map straight onto feature adjustments.
     const REASON_MAP: Record<string, [string, number]> = {
@@ -452,4 +453,14 @@ export const updateProfile = createServerFn({ method: "POST" })
       { onConflict: "user_id" },
     );
     return { ok: true };
+  });
+
+/** Resolve any TMDB film id, whether or not it is in the bundled catalog. */
+export const getMovieDetails = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ movieId: z.number() }).parse(data))
+  .handler(async ({ data }) => {
+    const local = MOVIES_BY_ID.get(data.movieId);
+    if (local) return { movie: local };
+    const remote = await tmdbMovie(data.movieId);
+    return { movie: remote };
   });
