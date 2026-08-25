@@ -2,14 +2,15 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { Check, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
+import { BarChart3, Check, ChevronDown, Heart, Plus, ThumbsDown, ArrowLeft } from "lucide-react";
 
 import { RequireAuth } from "@/components/require-auth";
 import { MoviePoster } from "@/components/movie-poster";
 import { MovieGrid, type GridItem } from "@/components/movie-grid";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { MOVIES, MOVIES_BY_ID } from "@/data/catalog";
-import { getRecommendations, getMovieDetails } from "@/lib/app.functions";
+import { getRecommendations, getMovieDetails, explainPick } from "@/lib/app.functions";
+import { ScoreBreakdownPanel } from "@/components/score-breakdown";
 import { registerMovies } from "@/lib/movie-registry";
 import { FEATURE_LABELS, semanticSimilarity } from "@/lib/recommender";
 import { useMovieAction, useSnapshot } from "@/hooks/use-app-data";
@@ -115,6 +116,15 @@ function MovieDetail() {
         .map(({ m }) => ({ movieId: m.id })),
     [movie],
   );
+
+  const explain = useServerFn(explainPick);
+  const [showWhy, setShowWhy] = useState(false);
+  const whyQuery = useQuery({
+    queryKey: ["why", movie.id],
+    queryFn: () => explain({ data: { movieId: movie.id } }),
+    enabled: showWhy,
+    staleTime: 60_000,
+  });
 
   const recommend = useServerFn(getRecommendations);
   const similarQuery = useQuery({
