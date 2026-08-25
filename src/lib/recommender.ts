@@ -324,7 +324,10 @@ export type RankInput = {
   filters?: MovieFilters | null;
   /** Learned filtering habits: a soft lean, applied even when no filter is set. */
   affinity?: FilterAffinity | null;
+  /** Score exactly these films, bypassing exclusions — used to explain a single pick. */
+  only?: Movie[];
 };
+
 
 /** Deterministic 0..1 pseudo-random from two integers. */
 function jitter(seed: number, id: number): number {
