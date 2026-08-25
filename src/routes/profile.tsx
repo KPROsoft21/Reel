@@ -7,6 +7,8 @@ import { RequireAuth } from "@/components/require-auth";
 
 import { useProfileUpdate, useSnapshot, useTagCorrection } from "@/hooks/use-app-data";
 import { FEATURE_LABELS } from "@/lib/recommender";
+import { useTasteSummary } from "@/hooks/use-taste-summary";
+
 
 
 export const Route = createFileRoute("/profile")({
