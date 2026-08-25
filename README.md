@@ -2,8 +2,6 @@
 
 > A personalized film recommender. Ask for what you're in the mood for, swipe through picks, or dive into a single film — every like, save, watch and skip feeds a taste model that gets sharper the more you use it.
 
-This project was built with [Lovable](https://lovable.dev).
-
 ## Brand
 
 The Reel brand mark is a stylized cream-colored serif “R” with a dark film reel tucked inside the top counter, set against a black background. It lives as the site favicon (`public/favicon.png`) and is referenced from `src/routes/__root.tsx`. It is intentionally not displayed inside the app UI — the top bar uses the wordmark “Reel” alone so the interface stays clean and the mark remains an identity signal for browsers, bookmarks, and home-screen icons.
