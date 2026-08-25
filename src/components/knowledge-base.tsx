@@ -45,7 +45,7 @@ export function KnowledgeBase() {
       title="Knowledge base"
       description="Tell the recommender anything about your taste in plain language. It summarises each note and applies it to every future pick."
     >
-      <div className="chamfer hairline bg-surface p-5">
+      <div className="chamfer hairline bg-background p-5">
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
