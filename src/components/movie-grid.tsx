@@ -36,7 +36,9 @@ export function MovieGrid({
             movie={movie}
             {...(typeof item.fit === "number" ? { fit: item.fit } : {})}
             {...(item.reasons ? { reasons: item.reasons } : {})}
+            {...(item.breakdown ? { breakdown: item.breakdown } : {})}
             {...(onRemove ? { onRemove } : {})}
+
             state={{
               liked: state?.liked ?? null,
               watched: state?.watched ?? false,
